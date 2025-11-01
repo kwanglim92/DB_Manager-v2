@@ -1,0 +1,10 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(del /s /q *.pyc 2)",
+      "Bash(/tmp/phase1_manager_diff.txt)"
+    ],
+    "deny": [],
+    "ask": []
+  }
+}
