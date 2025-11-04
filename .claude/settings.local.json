@@ -2,7 +2,13 @@
   "permissions": {
     "allow": [
       "Bash(del /s /q *.pyc 2)",
-      "Bash(/tmp/phase1_manager_diff.txt)"
+      "Bash(/tmp/phase1_manager_diff.txt)",
+      "Bash(tree:*)",
+      "Bash(dir:*)",
+      "Bash(xargs ls:*)",
+      "Bash(test:*)",
+      "Bash(sqlite3:*)",
+      "Bash(git add:*)"
     ],
     "deny": [],
     "ask": []
