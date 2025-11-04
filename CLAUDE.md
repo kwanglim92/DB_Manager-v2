@@ -122,16 +122,12 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 ### 애플리케이션 실행
 ```bash
-python src/main.py            # 레거시 버전 (안정, Phase 1 통합 완료)
+python src/main.py            # 메인 시스템 (안정, Phase 1 통합 완료)
                               # 모놀리식 구조 (5,070 lines)
-                              # 권장: 프로덕션, 안정성 우선
-
-python src/main_optimized.py  # 최적화 버전 (MVC 패턴, 모듈화)
-                              # 11개 파일, 관심사 분리
-                              # 권장: 개발, Phase 2 준비
+                              # 프로덕션 준비 완료
 ```
 
-**상세 비교**: `docs/SYSTEM_COMPARISON.md` 참조
+**참고**: 2025-11-04 리팩토링으로 main_optimized.py 및 app/core/ 디렉토리 제거됨. main.py 단일 시스템으로 통합.
 
 **프로그램 시작 확인** (정상 실행 시 콘솔 로그):
 ```
@@ -172,19 +168,19 @@ cd scripts && build.bat  # Windows 실행 파일 생성
 
 ## 아키텍처
 
-### 이중 시스템: 레거시 + 최적화
+### 단일 시스템: main.py (2025-11-04 리팩토링 완료)
 
-**레거시 시스템** (src/app/manager.py:1)
-- 모놀리식 파일 (4,931 lines)
+**메인 시스템** (src/app/manager.py:1)
+- 모놀리식 파일 (5,070 lines)
 - 안정, 프로덕션 준비 완료
-- 신규 기능 추가 지양
+- Phase 1 완전 통합 (Check list 시스템)
+- 진입점: `src/main.py`
 
-**최적화 시스템** (src/app/core/)
-- 모듈화 아키텍처 (MVC 패턴)
-- 신규 기능 권장 위치
-- 진입점: `src/main_optimized.py`
-
-**핵심 규칙**: 두 시스템은 동일 데이터베이스를 공유합니다. 스키마 변경 시 반드시 양쪽 모두 업데이트하세요.
+**점진적 최적화 계획**:
+- 긴 메서드 분할 (200+ lines → 50-100 lines)
+- 중복 코드 제거 (50% 감소 목표)
+- 서비스 레이어 활용 증가
+- 기능/UI/UX 100% 유지
 
 ### 핵심 계층
 
@@ -204,11 +200,11 @@ with self.db_schema.get_connection() as conn:
 - `Default_DB_Values`: 장비별 파라미터 기준값 (unique 제약: equipment_type_id + parameter_name)
 
 #### 2. 비즈니스 로직 계층
-**핵심 컨트롤러** (src/app/core/controllers/):
-- `mother_db_manager.py:30` - CandidateAnalyzer (80% 일치 파라미터 자동 감지)
-- `comparison_engine.py` - OptimizedComparisonEngine (병렬 처리, 청크 방식)
-- `qc_manager.py` - UnifiedQCSystem (자동 모드 선택)
-- `app_controller.py:26` - AppController (중앙 조정자)
+**핵심 컨트롤러** (src/app/manager.py):
+- DBManager 클래스: 모든 비즈니스 로직 통합
+- 파일 비교 엔진: 병렬 처리, 청크 방식
+- Mother DB 관리: CandidateAnalyzer (80% 일치 파라미터 자동 감지)
+- QC 검수 시스템: UnifiedQCSystem (자동 모드 선택)
 
 #### 3. 서비스 계층 (점진적 도입)
 **위치**: `src/app/services/`
@@ -280,9 +276,9 @@ with self.db_schema.get_connection() as conn:
 ## 개발 가이드라인
 
 ### 신규 기능 추가
-- **레거시 시스템**: 중요 버그 수정만, 신규 기능 지양
-- **최적화 시스템**: 신규 기능 권장 (UI → Controller → Manager → DBSchema 패턴)
+- **메인 시스템** (manager.py): 신규 기능 추가 시 메서드 분할 원칙 적용
 - **서비스 레이어**: 인터페이스 정의 → 구현 → ServiceFactory 등록 → Feature Flag 추가
+- **최적화 원칙**: 기능 추가 시 긴 메서드(100+ lines) 분할, 중복 코드 제거
 
 ### Mother DB 작업
 **권장 워크플로우** (3단계):
@@ -308,9 +304,9 @@ with self.db_schema.get_connection() as conn:
 2. **순환 임포트**: 서비스 레이어는 인터페이스만, 도메인 간 구체 구현 임포트 금지
 3. **모드 확인**: Mother DB/Default DB 작업 전 권한 확인
 4. **중복 파라미터**: (equipment_type_id, parameter_name) Unique 제약 예외 처리
-5. **레거시 호환성**: 양쪽 진입점(main.py, main_optimized.py)에서 테스트
-6. **Audit Log Action 타입**: 'UPDATE'/'DELETE' 대신 'MODIFY'/'REMOVE' 사용 (CHECK 제약)
-7. **QC Import**: `app.qc`는 패키지이므로 `from app.qc import ...`로 import (레거시 함수 포함)
+5. **Audit Log Action 타입**: 'UPDATE'/'DELETE' 대신 'MODIFY'/'REMOVE' 사용 (CHECK 제약)
+6. **QC Import**: `app.qc`는 패키지이므로 `from app.qc import ...`로 import (레거시 함수 포함)
+7. **메서드 길이**: 신규 메서드는 100 lines 이하 유지 (가독성 및 테스트 용이성)
 
 ## 데이터베이스 스키마
 
@@ -873,33 +869,32 @@ src/app/
   - 리팩토링: 별도 Phase로 분리
   - 점진적 개선 우선
 
-### 5. 향후 조치 계획
+### 5. 향후 조치 계획 - ✅ **완료** (2025-11-04)
 
-#### 즉시 조치 필요
-- [ ] 사용자와 복구 방향 논의
-- [ ] main.py vs main_optimized.py 선택 확정
-- [ ] 불필요한 파일 정리 (선택에 따라)
+#### 최종 결정: 옵션 A 채택 (main_optimized.py 완전 삭제)
 
-#### 선택지
+**사용자 결정** (2025-11-04):
+- main_optimized.py 및 관련 파일 완전 제거 (43개 파일)
+- main.py 단일 시스템으로 통합
+- 원래 계획대로 main.py만 최적화
+- 기능/UI/UX 100% 유지
 
-**옵션 A: main_optimized.py 완전 삭제** (원래 계획 복원)
-- main_optimized.py, src/app/core/ 폴더 삭제
-- docs/SYSTEM_COMPARISON.md 삭제
-- Phase 1 기능을 main.py에 재통합 (UI 변경 없이)
-- **장점**: 원래 계획대로, 단순 명료
-- **단점**: 작업 일부 재수행 필요
+**삭제 완료** (43개 파일):
+- ✅ `src/main_optimized.py`
+- ✅ `src/app/core/` 전체 디렉토리 (11개)
+- ✅ `src/app/ui/` 디렉토리 (30개, checklist_manager_dialog.py는 이동)
+- ✅ `docs/SYSTEM_COMPARISON.md`
 
-**옵션 B: 두 시스템 병행 유지** (현재 상태)
-- main.py: 프로덕션 (안정성)
-- main_optimized.py: 개발/테스트 (신규 기능)
-- **장점**: 기존 작업 보존
-- **단점**: 유지보수 부담 증가
+**보존 완료**:
+- ✅ `src/app/services/` (14개 파일) - Phase 1 서비스 레이어
+- ✅ `src/app/qc/` (3개 파일) - Phase 1 QC 시스템
+- ✅ `src/app/dialogs/checklist_manager_dialog.py` (ui/dialogs/에서 이동)
 
-**옵션 C: Phase 1 기능을 main.py로 재통합**
-- main_optimized.py는 보류 (향후 Phase 2에서 활용)
-- Check list 시스템을 main.py에 통합 (UI 변경 없이)
-- **장점**: 원래 목표 달성 + 작업 보존
-- **단점**: 추가 통합 작업 필요
+**점진적 최적화 계획** (1-2주):
+1. **우선순위 P0**: 긴 메서드 분할 (290 lines → 4개 메서드)
+2. **우선순위 P1**: 중복 코드 제거 (50% 감소)
+3. **우선순위 P2**: 서비스 레이어 활용 증가
+4. **우선순위 P3**: 가독성 개선 (상수 정의, docstring)
 
 #### 재발 방지 계획
 1. **요구사항 명확화 프로세스**:
@@ -978,6 +973,16 @@ src/app/
 ---
 
 ## 문서 업데이트 이력
+
+### 2025-11-04 (main_optimized.py 제거 리팩토링)
+- **최종 결정**: 옵션 A 채택 (main_optimized.py 완전 삭제)
+- **삭제 완료**: 43개 파일 (main_optimized.py, app/core/, app/ui/, docs/SYSTEM_COMPARISON.md)
+- **보존 완료**: Phase 1 핵심 파일 (services/, qc/, checklist_manager_dialog.py)
+- **CLAUDE.md 업데이트**:
+  - "이중 시스템" → "단일 시스템" 섹션 변경
+  - main_optimized.py 관련 내용 전체 제거
+  - 점진적 최적화 계획 추가 (긴 메서드 분할, 중복 제거)
+- **목표**: 원래 계획대로 main.py만 최적화, 혼란 제거
 
 ### 2025-11-01 (프로젝트 이슈 및 교훈 섹션 추가)
 - **새 섹션 추가**: "프로젝트 이슈 및 교훈"

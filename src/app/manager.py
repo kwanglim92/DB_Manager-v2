@@ -586,19 +586,27 @@ class DBManager:
             return
 
         try:
-            # AccessControl을 사용한 인증
-            import importlib.util
+            # 관리자 비밀번호 검증 (SHA-256)
+            import hashlib
+            import json
             import os
-            spec = importlib.util.spec_from_file_location(
-                "access_control",
-                os.path.join(os.path.dirname(os.path.dirname(__file__)), "app", "core", "utils", "access_control.py")
+
+            # config/settings.json에서 admin_password_hash 읽기
+            config_path = os.path.join(
+                os.path.dirname(os.path.dirname(os.path.dirname(__file__))),
+                "config", "settings.json"
             )
-            access_control_module = importlib.util.module_from_spec(spec)
-            spec.loader.exec_module(access_control_module)
 
-            ac = access_control_module.AccessControl()
+            admin_hash_expected = None
+            if os.path.exists(config_path):
+                with open(config_path, 'r', encoding='utf-8') as f:
+                    config = json.load(f)
+                    admin_hash_expected = config.get('access_control', {}).get('admin_password_hash', '')
 
-            if ac.authenticate_admin(password):
+            # 입력한 비밀번호를 SHA-256 해시로 변환
+            password_hash = hashlib.sha256(password.encode()).hexdigest()
+
+            if password_hash == admin_hash_expected:
                 # 관리자 모드 활성화
                 self.admin_mode = True
 
@@ -632,7 +640,7 @@ class DBManager:
                 self.service_factory = ServiceFactory(self.db_schema)
 
             # Check list 관리 다이얼로그 열기
-            from app.ui.dialogs.checklist_manager_dialog import ChecklistManagerDialog
+            from app.dialogs.checklist_manager_dialog import ChecklistManagerDialog
             ChecklistManagerDialog(self.window, self.db_schema, self.service_factory)
 
         except Exception as e:
