@@ -221,11 +221,22 @@ with self.db_schema.get_connection() as conn:
 
 ### 권한 시스템 (3단계)
 
-| 모드 | 접근 가능 | 진입 방법 |
-|------|-----------|-----------|
-| **생산 엔지니어** | DB 비교 (읽기), 보고서 확인 | 기본 모드 |
-| **QC 엔지니어** | QC 검수, Check list 조회, 장비별 Check list 제안 | 도구 → 모드 전환 → QC 비밀번호 |
-| **관리자** | 모든 기능 + Default DB 관리 + Check list 관리 | 도움말 → 관리자 모드 → 관리자 비밀번호 |
+| 모드 | 접근 가능 | 진입 방법 | 비밀번호 |
+|------|-----------|-----------|----------|
+| **생산 엔지니어** | DB 비교 (읽기), 보고서 확인 | 기본 모드 | - |
+| **QC 엔지니어** | QC 검수, Check list 조회 | 도구 → 사용자 모드 전환 | 1234 |
+| **관리자** (최상위) | 모든 기능 (생산 + QC + Default DB 관리 + Check list 관리) | 도움말 → Maintenance | 1234 |
+
+**권한 차이**:
+- **QC 엔지니어**: QC 검수 탭만 생성 (QC 검수, Check list 조회 가능 / Default DB 관리 불가)
+- **관리자**: QC 탭 + Default DB 관리 탭 생성 (QC 기능 + Default DB 관리 + Check list 관리)
+
+**모드 전환 동작** (2025-11-06 변경):
+- **생산 → QC 엔지니어**: QC 검수 탭만 생성
+- **생산 → 관리자**: QC 탭 + Default DB 관리 탭 생성
+- **QC/관리자 → 생산**: 모든 탭 제거, `admin_mode` 플래그 초기화
+- **QC → 관리자**: Default DB 관리 탭 추가
+- **관리자 → QC**: Default DB 관리 탭 제거 (권한 하향)
 
 **Default DB 접근 제한 이유**: Default DB는 기준점(Ground Truth)이므로 관리자만 변경 가능하여 데이터 무결성 보장
 
@@ -374,7 +385,7 @@ with self.db_schema.get_connection() as conn:
 1. 다중 파일 로드 → 2. 데이터 정규화/정렬 → 3. 비교 모드 선택 (그리드 뷰/차이 뷰) → 4. 결과 내보내기
 
 ### Check list 관리 (Phase 1)
-1. **관리자 모드 진입** (도움말 → 관리자 모드, 비밀번호: 1)
+1. **관리자 모드 진입** (도움말 → 🔐 Maintenance, 비밀번호: 1234)
 2. **Check list 관리 UI 열기**
 3. **공통 Check list 관리**:
    - 조회, 추가, 수정, 삭제
@@ -973,6 +984,22 @@ src/app/
 ---
 
 ## 문서 업데이트 이력
+
+### 2025-11-06 (QC 엔지니어 vs 관리자 권한 분리)
+- **권한 시스템 개선**: QC 엔지니어와 관리자 모드 명확한 분리
+  - QC 엔지니어: QC 검수 탭만 생성 (Default DB 관리 불가)
+  - 관리자: QC 검수 탭 + Default DB 관리 탭 (최상위 권한)
+- **코드 변경사항**:
+  - `manager.py:547`: 도움말 메뉴에 "🔐 Maintenance" 항목 추가
+  - `manager.py:564`: toggle_maint_mode()에 admin_mode 플래그 초기화 추가
+  - `manager.py:758`: Default DB 관리 탭 조건부 생성 (admin_mode 체크)
+  - `manager.py:2498`: disable_maint_features()에 admin_mode 플래그 초기화 추가
+  - `config/settings.json:5`: 관리자 비밀번호 1234로 통일
+- **버그 수정**: admin_mode 플래그 초기화 누락으로 인한 권한 지속 문제 해결
+  - 증상: 관리자 모드 1회 진입 후 QC 모드로 전환해도 Default DB 탭 유지
+  - 원인: toggle_maint_mode(), disable_maint_features()에서 admin_mode 초기화 누락
+  - 해결: 모드 전환 시 admin_mode = False 명시적 설정
+- **문서화**: CLAUDE.md 권한 시스템 섹션 업데이트 (모드 전환 동작 상세화)
 
 ### 2025-11-04 (main_optimized.py 제거 리팩토링)
 - **최종 결정**: 옵션 A 채택 (main_optimized.py 완전 삭제)

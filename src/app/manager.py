@@ -543,6 +543,8 @@ class DBManager:
         help_menu.add_command(label="사용 설명서 (F1)", command=self.show_user_guide)
         help_menu.add_separator()
         help_menu.add_command(label="프로그램 정보", command=self.show_about)
+        help_menu.add_separator()
+        help_menu.add_command(label="🔐 Maintenance", command=self.enter_admin_mode)
         menubar.add_cascade(label="도움말", menu=help_menu)
         self.window.config(menu=menubar)
 
@@ -559,6 +561,7 @@ class DBManager:
         if self.maint_mode:
             self.update_log("유지보수 모드가 비활성화되었습니다. (장비 생산 엔지니어 모드)")
             self.maint_mode = False
+            self.admin_mode = False  # 관리자 모드도 함께 해제
             self.status_bar.config(text="장비 생산 엔지니어 모드")
             self.disable_maint_features()
         else:
@@ -751,19 +754,22 @@ class DBManager:
             # QC 검수 탭 생성 (Enhanced QC 사용)
             self.update_log("📋 Enhanced QC 검수 탭 생성 중...")
             self.create_qc_tabs_with_advanced_features()
-            
-            # Default DB 관리 탭 생성 (동기적 실행)
-            self.update_log("🔧 Default DB 관리 탭 생성 중...")
-            self.create_default_db_tab()
-            
+
+            # Default DB 관리 탭 생성 (관리자 모드에서만)
+            if hasattr(self, 'admin_mode') and self.admin_mode:
+                self.update_log("🔧 Default DB 관리 탭 생성 중...")
+                self.create_default_db_tab()
+
             # 상태 업데이트
-            self.update_log("✅ QC 엔지니어 모드가 활성화되었습니다.")
-            self.status_bar.config(text="QC 엔지니어 모드")
-            
-            # Performance 기능 확인 메시지
-            self.update_log("🎯 Performance 기능이 활성화되었습니다!")
-            self.update_log("   - Default DB 관리 탭에서 Performance 관리 버튼들을 확인하세요.")
-            self.update_log("   - 트리뷰에서 가로 스크롤하여 🎯 Performance 컬럼을 확인하세요.")
+            mode_name = "관리자 모드" if (hasattr(self, 'admin_mode') and self.admin_mode) else "QC 엔지니어 모드"
+            self.update_log(f"✅ {mode_name}가 활성화되었습니다.")
+            self.status_bar.config(text=mode_name)
+
+            # Performance 기능 확인 메시지 (관리자 모드에서만)
+            if hasattr(self, 'admin_mode') and self.admin_mode:
+                self.update_log("🎯 Performance 기능이 활성화되었습니다!")
+                self.update_log("   - Default DB 관리 탭에서 Performance 관리 버튼들을 확인하세요.")
+                self.update_log("   - 트리뷰에서 가로 스크롤하여 🎯 Performance 컬럼을 확인하세요.")
             
         except Exception as e:
             error_msg = f"유지보수 모드 활성화 중 오류 발생: {str(e)}"
@@ -2489,7 +2495,8 @@ class DBManager:
             
             # 유지보수 모드 비활성화
             self.maint_mode = False
-            
+            self.admin_mode = False  # 관리자 모드도 함께 해제
+
             # 상태바 업데이트
             if hasattr(self, 'status_bar'):
                 self.status_bar.config(text="장비 생산 엔지니어 모드")
@@ -4368,7 +4375,7 @@ class DBManager:
         help_menu.add_separator()
         help_menu.add_command(label="ℹ️ 프로그램 정보", command=self.show_about)
         help_menu.add_separator()
-        help_menu.add_command(label="🔐 관리자 모드", command=self.enter_admin_mode)
+        help_menu.add_command(label="🔐 Maintenance", command=self.enter_admin_mode)
         menubar.add_cascade(label="도움말", menu=help_menu)
         
         self.window.config(menu=menubar)

@@ -16,7 +16,11 @@
       "Bash(if exist \"src\\app\\core\" rmdir /s /q \"src\\app\\core\")",
       "Bash(if exist \"src\\app\\ui\" rmdir /s /q \"src\\app\\ui\")",
       "Bash(if exist \"docs\\SYSTEM_COMPARISON.md\" del \"docs\\SYSTEM_COMPARISON.md\")",
-      "Bash(python tools/test_phase1.py:*)"
+      "Bash(python tools/test_phase1.py:*)",
+      "Bash(python3:*)",
+      "Bash(python src/main.py:*)",
+      "Bash(taskkill:*)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []
