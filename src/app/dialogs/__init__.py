@@ -6,8 +6,10 @@ Dialogs Package
 
 from .checklist_manager_dialog import ChecklistManagerDialog
 from .equipment_hierarchy_dialog import EquipmentHierarchyDialog
+from .configuration_dialog import ConfigurationDialog
 
 __all__ = [
     'ChecklistManagerDialog',
     'EquipmentHierarchyDialog',
+    'ConfigurationDialog',
 ]

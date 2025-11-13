@@ -650,6 +650,22 @@ class DBManager:
             messagebox.showerror("오류", f"Check list 관리 열기 실패:\n{str(e)}")
             self.update_log(f"⚠️ Check list 관리 오류: {e}")
 
+    def open_equipment_hierarchy(self):
+        """Equipment Hierarchy 관리 다이얼로그 열기 (Phase 1.5)"""
+        try:
+            # 서비스 팩토리 초기화 확인
+            if not hasattr(self, 'service_factory') or self.service_factory is None:
+                from app.services import ServiceFactory
+                self.service_factory = ServiceFactory(self.db_schema)
+
+            # Equipment Hierarchy 관리 다이얼로그 열기
+            from app.dialogs.equipment_hierarchy_dialog import EquipmentHierarchyDialog
+            EquipmentHierarchyDialog(self.window, self.db_schema, self.service_factory)
+
+        except Exception as e:
+            messagebox.showerror("오류", f"Equipment Hierarchy 관리 열기 실패:\n{str(e)}")
+            self.update_log(f"⚠️ Equipment Hierarchy 관리 오류: {e}")
+
     def show_admin_features_dialog(self):
         """관리자 기능 안내 다이얼로그"""
         dialog = tk.Toplevel(self.window)
@@ -702,6 +718,13 @@ class DBManager:
             mgmt_btn_frame,
             text="📋 Check list 관리",
             command=self.open_checklist_manager,
+            width=25
+        ).pack(pady=5)
+
+        ttk.Button(
+            mgmt_btn_frame,
+            text="🏗️ Equipment Hierarchy 관리",
+            command=self.open_equipment_hierarchy,
             width=25
         ).pack(pady=5)
 

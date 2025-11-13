@@ -8,6 +8,8 @@ import tkinter as tk
 from tkinter import ttk, messagebox, simpledialog
 import json
 
+from .configuration_dialog import ConfigurationDialog
+
 
 class EquipmentHierarchyDialog:
     """Equipment Hierarchy 관리 다이얼로그"""
@@ -360,50 +362,20 @@ class EquipmentHierarchyDialog:
             messagebox.showwarning("경고", "Type을 선택하거나 Configuration을 선택해주세요.")
             return
 
-        # TODO: Week 2 Day 3에서 ConfigurationDialog 구현
-        # 임시: 간단한 입력
-        config_name = simpledialog.askstring(
-            "Add Configuration",
-            "Configuration Name:",
-            parent=self.dialog
-        )
-
-        if not config_name:
-            return
-
-        port_count = simpledialog.askinteger(
-            "Add Configuration",
-            "Port Count:",
+        # ConfigurationDialog 열기 (Week 2 Day 3)
+        dialog = ConfigurationDialog(
             parent=self.dialog,
-            initialvalue=1,
-            minvalue=1
+            configuration_service=self.configuration_service,
+            type_id=type_id,
+            config=None  # 추가 모드
         )
 
-        if not port_count:
-            return
+        # 다이얼로그가 닫힐 때까지 대기
+        self.dialog.wait_window(dialog.dialog)
 
-        wafer_count = simpledialog.askinteger(
-            "Add Configuration",
-            "Wafer Count:",
-            parent=self.dialog,
-            initialvalue=1,
-            minvalue=1
-        )
-
-        if not wafer_count:
-            return
-
-        try:
-            config_id = self.configuration_service.create_configuration(
-                type_id=type_id,
-                configuration_name=config_name,
-                port_count=port_count,
-                wafer_count=wafer_count
-            )
-            messagebox.showinfo("성공", f"Configuration '{config_name}' 추가 완료 (ID: {config_id})")
+        # 결과 확인 및 새로고침
+        if dialog.get_result():
             self._refresh()
-        except Exception as e:
-            messagebox.showerror("오류", f"Configuration 추가 실패:\n{str(e)}")
 
     def _add_child(self):
         """선택된 항목에 맞는 자식 추가"""
@@ -491,8 +463,30 @@ class EquipmentHierarchyDialog:
 
     def _edit_configuration(self, config_id):
         """Configuration 수정"""
-        # TODO: Week 2 Day 3에서 ConfigurationDialog 구현
-        messagebox.showinfo("정보", "Configuration Edit Dialog는 Week 2 Day 3에서 구현됩니다.")
+        # 기존 Configuration 조회
+        try:
+            config = self.configuration_service.get_configuration_by_id(config_id)
+            if not config:
+                messagebox.showerror("오류", "Configuration을 찾을 수 없습니다.")
+                return
+
+            # ConfigurationDialog 열기 (Week 2 Day 3)
+            dialog = ConfigurationDialog(
+                parent=self.dialog,
+                configuration_service=self.configuration_service,
+                type_id=config.equipment_type_id,
+                config=config  # 수정 모드
+            )
+
+            # 다이얼로그가 닫힐 때까지 대기
+            self.dialog.wait_window(dialog.dialog)
+
+            # 결과 확인 및 새로고침
+            if dialog.get_result():
+                self._refresh()
+
+        except Exception as e:
+            messagebox.showerror("오류", f"Configuration 수정 실패:\n{str(e)}")
 
     def _delete_selected(self):
         """선택된 항목 삭제"""

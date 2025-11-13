@@ -107,13 +107,13 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 ## 전체 프로젝트 진행 상황
 
-### 🎯 전체 로드맵 진행도: **약 43%**
+### 🎯 전체 로드맵 진행도: **약 50%**
 
 | Phase | 목표 | 상태 | 진행률 | 완료일 |
 |-------|------|------|--------|--------|
 | **Phase 0** | 기본 시스템 구축 | ✅ 완료 | 100% | 2024년 |
 | **Phase 1** | Check list 기반 QC 강화 | ✅ 완료 | 100% | 2025-11-01 |
-| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 43% | 2025-11-13 시작 |
+| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 50% | 2025-11-13 시작 |
 | **Phase 2** | Raw Data Management | ⏳ 계획 | 0% | Phase 1.5 완료 후 |
 | **Phase 3** | 모듈 기반 아키텍처 | 📋 예정 | 0% | 향후 6-12개월 |
 | **Phase 4** | AI 기반 예측/최적화 | 📋 예정 | 0% | TBD |
@@ -190,10 +190,20 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
   - CategoryService/ConfigurationService 통합
   - Model/Type/Configuration CRUD 기능
   - Customer-Specific Configuration 표시 (⚙️🌟)
-- 🔄 **Week 2 Day 3 준비중** (Configuration Management Dialog):
-  - Add Configuration Dialog (Port/Wafer 드롭다운)
-  - Custom Options JSON 편집기
-  - Customer-specific 플래그
+- ✅ **Week 2 Day 3 완료** (Configuration Management Dialog):
+  - 파일: `src/app/dialogs/configuration_dialog.py` (400+ lines)
+  - ConfigurationDialog 클래스 구현 (Add/Edit 모드)
+  - Port Type 드롭다운 (Single/Double/Multi/Custom)
+  - Wafer Size 드롭다운 (150mm/200mm/300mm/복합/Custom)
+  - Port/Wafer Count 스피너 (검증: > 0)
+  - Custom Options JSON 편집기 (Validate 버튼, 자동 포맷팅)
+  - Customer-specific 플래그 및 조건부 입력
+  - Description 텍스트 영역
+  - EquipmentHierarchyDialog 통합 (Add/Edit Configuration)
+  - main.py 관리자 메뉴 추가 ("🏗️ Equipment Hierarchy 관리")
+- 🔄 **Week 2 Day 4 준비중** (Default DB Management 개선):
+  - Configuration별 Default DB 관리
+  - Type 공통 Default DB vs Configuration별 Override
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
