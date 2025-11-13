@@ -2717,10 +2717,27 @@ class DBManager:
                                        command=self.delete_equipment_type, width=10)
             delete_type_btn.pack(side=tk.LEFT, padx=(0, 6))
             
-            refresh_btn = ttk.Button(type_buttons_frame, text="Refresh", 
+            refresh_btn = ttk.Button(type_buttons_frame, text="Refresh",
                                    command=self.refresh_equipment_types, width=10)
             refresh_btn.pack(side=tk.LEFT, padx=(0, 6))
-            
+
+            # Configuration 선택 (Phase 1.5 Week 2 Day 4)
+            config_select_frame = ttk.Frame(equipment_frame)
+            config_select_frame.pack(fill=tk.X, pady=(8, 0))
+
+            ttk.Label(config_select_frame, text="Configuration:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 8))
+            self.configuration_var = tk.StringVar()
+            self.configuration_combo = ttk.Combobox(config_select_frame, textvariable=self.configuration_var,
+                                                   state="readonly", width=40, font=("Segoe UI", 9))
+            self.configuration_combo.pack(side=tk.LEFT, padx=(0, 12))
+            self.configuration_combo.bind("<<ComboboxSelected>>", self.on_configuration_selected)
+
+            # "All (Type Common)" 옵션 표시 레이블
+            self.config_mode_label = ttk.Label(config_select_frame, text="", font=("Segoe UI", 9, "italic"), foreground="gray")
+            self.config_mode_label.pack(side=tk.LEFT, padx=(0, 8))
+
+            self.update_log("✅ Configuration 콤보박스 생성 완료")
+
             # 파라미터 관리 섹션
             param_frame = ttk.LabelFrame(control_frame, text="Parameter Management", padding=12)
             param_frame.pack(fill=tk.X, pady=(0, 8))
@@ -2758,8 +2775,8 @@ class DBManager:
             tree_frame = ttk.Frame(tree_container)
             tree_frame.pack(fill=tk.BOTH, expand=True)
             
-            # 트리뷰 컬럼 정의 (순차 번호 컬럼으로 변경)
-            columns = ("no", "parameter_name", "module", "part", "item_type", "default_value", "min_spec", "max_spec", 
+            # 트리뷰 컬럼 정의 (Phase 1.5: Scope 컬럼 추가)
+            columns = ("no", "parameter_name", "scope", "module", "part", "item_type", "default_value", "min_spec", "max_spec",
                       "is_performance", "description")
 
             self.default_db_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
@@ -2769,8 +2786,9 @@ class DBManager:
             headers = {
                 "no": "No.",  # 순차 번호 컬럼
                 "parameter_name": "ItemName",
+                "scope": "Scope",  # Phase 1.5: Type Common vs Configuration
                 "module": "Module",
-                "part": "Part", 
+                "part": "Part",
                 "item_type": "Data Type",
                 "default_value": "Default Value",
                 "min_spec": "Min Spec",
@@ -2782,7 +2800,8 @@ class DBManager:
             # 컬럼 너비 최적화
             column_widths = {
                 "no": 50,  # 순차 번호 컬럼 너비
-                "parameter_name": 220,
+                "parameter_name": 200,  # 약간 줄임
+                "scope": 100,  # Scope 컬럼
                 "module": 80,
                 "part": 100,
                 "item_type": 85,
@@ -3141,16 +3160,24 @@ class DBManager:
         try:
             selected = self.equipment_type_var.get()
             self.update_log(f"🔄 장비 유형 선택됨: '{selected}'")
-            
+
             if not selected:
                 self.update_default_db_display([])
                 self.update_log("⚠️ 선택된 장비 유형이 없음 - 빈 목록 표시")
+                # Configuration 콤보박스 초기화
+                if hasattr(self, 'configuration_combo'):
+                    self.configuration_combo['values'] = []
+                    self.configuration_var.set('')
                 return
-                
+
             # 장비 유형 ID 추출
             type_id_str = selected.split("ID: ")[1][:-1]
             type_id = int(type_id_str)
             self.update_log(f"🔍 추출된 장비 유형 ID: {type_id}")
+
+            # Phase 1.5: Configuration 목록 로드
+            if hasattr(self, 'configuration_combo'):
+                self._load_configurations_for_type(type_id)
             
             # 🆕 Performance 필터 적용하여 파라미터 조회 (현재는 checklist_only 지원)
             performance_only = hasattr(self, 'show_performance_only_var') and self.show_performance_only_var.get()
@@ -3181,6 +3208,137 @@ class DBManager:
             error_msg = f"장비 유형 선택 처리 오류: {e}"
             self.update_log(f"❌ {error_msg}")
             print(f"DEBUG - on_equipment_type_selected error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _load_configurations_for_type(self, type_id):
+        """Phase 1.5: Equipment Type에 속한 Configuration 목록 로드"""
+        try:
+            # ServiceFactory 초기화 확인
+            if not hasattr(self, 'service_factory') or self.service_factory is None:
+                from app.services import ServiceFactory
+                self.service_factory = ServiceFactory(self.db_schema)
+
+            configuration_service = self.service_factory.get_configuration_service()
+            if not configuration_service:
+                self.update_log("⚠️ ConfigurationService를 사용할 수 없습니다.")
+                self.configuration_combo['values'] = ["All (Type Common)"]
+                self.configuration_var.set("All (Type Common)")
+                return
+
+            # Configuration 목록 조회
+            configurations = configuration_service.get_configurations_by_type(type_id)
+            self.update_log(f"📋 조회된 Configuration 수: {len(configurations)}개")
+
+            # 콤보박스 값 설정 ("All (Type Common)" + Configuration 목록)
+            config_options = ["All (Type Common)"]
+            self.current_type_configs = {}  # Configuration ID 매핑 저장
+
+            for config in configurations:
+                label = f"{config.configuration_name}"
+                if config.is_customer_specific:
+                    label += f" (Customer: {config.customer_name})"
+                label += f" [ID: {config.id}]"
+                config_options.append(label)
+                self.current_type_configs[label] = config.id
+
+            self.configuration_combo['values'] = config_options
+
+            # 기본값: "All (Type Common)" 선택
+            self.configuration_var.set("All (Type Common)")
+            self.config_mode_label.config(text="(Showing Type-level common parameters)")
+
+            self.update_log("✅ Configuration 목록 로드 완료")
+
+        except Exception as e:
+            self.update_log(f"❌ Configuration 로드 오류: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def on_configuration_selected(self, event=None):
+        """Phase 1.5: Configuration 선택 시 Default DB 표시 전환"""
+        try:
+            selected_config = self.configuration_var.get()
+            self.update_log(f"🔄 Configuration 선택됨: '{selected_config}'")
+
+            if not selected_config:
+                return
+
+            # Equipment Type ID 추출
+            selected_type = self.equipment_type_var.get()
+            if not selected_type:
+                self.update_log("⚠️ Equipment Type이 선택되지 않음")
+                return
+
+            type_id_str = selected_type.split("ID: ")[1][:-1]
+            type_id = int(type_id_str)
+
+            if selected_config == "All (Type Common)":
+                # Type 공통 Default DB 표시
+                self.config_mode_label.config(text="(Showing Type-level common parameters)")
+                self.current_selected_config_id = None  # Type 공통 모드
+                performance_only = hasattr(self, 'show_performance_only_var') and self.show_performance_only_var.get()
+                default_values = self.db_schema.get_default_values(type_id, checklist_only=performance_only)
+
+                # Scope 정보 추가 (레거시 형식 확장)
+                default_values_with_scope = []
+                for item in default_values:
+                    item_list = list(item) if isinstance(item, tuple) else item
+                    item_list.append("Type Common")  # Scope 추가
+                    default_values_with_scope.append(tuple(item_list))
+
+                self.update_default_db_display(default_values_with_scope)
+                self.update_log("✅ Type 공통 Default DB 표시")
+            else:
+                # Configuration별 Default DB 표시
+                config_id = self.current_type_configs.get(selected_config)
+                if not config_id:
+                    self.update_log("⚠️ Configuration ID를 찾을 수 없음")
+                    return
+
+                self.current_selected_config_id = config_id  # Configuration별 모드
+                self.config_mode_label.config(text=f"(Showing Configuration-specific + Type common)")
+
+                # ConfigurationService로 Configuration별 Default DB 조회
+                configuration_service = self.service_factory.get_configuration_service()
+                default_values_obj = configuration_service.get_default_values_by_configuration(
+                    config_id=config_id,
+                    include_type_common=True  # Type 공통 포함
+                )
+
+                # DefaultDBValue 객체 리스트를 레거시 튜플 형식으로 변환
+                default_values_with_scope = []
+                for value_obj in default_values_obj:
+                    # 레거시 형식으로 변환 (튜플)
+                    # (id, parameter_name, default_value, min_spec, max_spec, type_name, ...)
+                    scope = "Type Common" if value_obj.is_type_common else "Configuration"
+
+                    # 기본 필드 (최소 필수 필드만)
+                    item_tuple = (
+                        value_obj.id,
+                        value_obj.parameter_name,
+                        value_obj.default_value,
+                        None,  # min_spec (Phase 1.5에서 제거됨)
+                        None,  # max_spec (Phase 1.5에서 제거됨)
+                        value_obj.type_name or "",  # type_name
+                        0,  # occurrence_count
+                        0,  # total_files
+                        0.0,  # confidence_score
+                        "",  # source_files
+                        value_obj.notes or "",  # description
+                        "",  # module_name
+                        "",  # part_name
+                        "",  # item_type
+                        0,  # is_performance
+                        scope  # Scope (추가)
+                    )
+                    default_values_with_scope.append(item_tuple)
+
+                self.update_default_db_display(default_values_with_scope)
+                self.update_log(f"✅ Configuration ID {config_id}의 Default DB 표시 (총 {len(default_values_obj)}개)")
+
+        except Exception as e:
+            self.update_log(f"❌ Configuration 선택 처리 오류: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3262,19 +3420,23 @@ class DBManager:
         # 순차 번호와 함께 데이터 표시
         for idx, item in enumerate(default_values, 1):
             try:
+                # Phase 1.5: Scope 정보 추출 (16번째 요소)
+                scope_info = item[15] if len(item) > 15 else "Type Common"
+
                 if len(item) >= 15:
                     # 올바른 SQL 순서에 맞게 파싱
                     record_id, param_name, default_value, min_spec, max_spec, type_name, occurrence_count, total_files, confidence_score, source_files, description, module_name, part_name, item_type, is_performance = item[:15]
-                    
+
                     # Performance 표시
                     performance_display = "Yes" if is_performance == 1 else "No"
-                    
-                    # 순차 번호를 첫 번째 컬럼에 표시
+
+                    # 순차 번호와 Scope를 포함하여 표시 (Phase 1.5)
                     values = (
                         str(idx),  # 순차 번호 (1, 2, 3...)
-                        param_name or "", 
+                        param_name or "",
+                        scope_info,  # Scope (Type Common / Configuration)
                         module_name or "",  # 실제 모듈명 사용
-                        part_name or "", 
+                        part_name or "",
                         item_type or "double",
                         str(default_value) if default_value is not None else "",
                         str(min_spec) if min_spec is not None else "",
@@ -3292,6 +3454,7 @@ class DBManager:
                     values = (
                         str(idx),  # 순차 번호
                         param_name or "",
+                        scope_info,  # Scope (Phase 1.5)
                         "", "", "double",
                         str(default_value) if default_value is not None else "",
                         str(min_spec) if min_spec is not None else "",
