@@ -635,20 +635,15 @@ class DBManager:
             self.update_log(f"⚠️ 관리자 모드 진입 오류: {e}")
 
     def open_checklist_manager(self):
-        """Check list 관리 다이얼로그 열기"""
+        """QC Checklist 관리 다이얼로그 열기 (Phase 1.5 Week 3)"""
         try:
-            # 서비스 팩토리 초기화 확인
-            if not hasattr(self, 'service_factory') or self.service_factory is None:
-                from app.services import ServiceFactory
-                self.service_factory = ServiceFactory(self.db_schema)
-
-            # Check list 관리 다이얼로그 열기
+            # QC Checklist 관리 다이얼로그 열기
             from app.dialogs.checklist_manager_dialog import ChecklistManagerDialog
-            ChecklistManagerDialog(self.window, self.db_schema, self.service_factory)
+            ChecklistManagerDialog(self.window, self.db_schema)
 
         except Exception as e:
-            messagebox.showerror("오류", f"Check list 관리 열기 실패:\n{str(e)}")
-            self.update_log(f"⚠️ Check list 관리 오류: {e}")
+            messagebox.showerror("오류", f"QC Checklist 관리 열기 실패:\n{str(e)}")
+            self.update_log(f"⚠️ QC Checklist 관리 오류: {e}")
 
     def open_equipment_hierarchy(self):
         """Equipment Hierarchy 관리 다이얼로그 열기 (Phase 1.5)"""
@@ -697,10 +692,10 @@ class DBManager:
 
         features = [
             "✅ Default DB 관리 (Mother DB 생성/수정/삭제)",
-            "✅ Check list 관리 (공통/장비별 Check list 추가/수정)",
+            "✅ QC Checklist 관리 (ItemName 기반, Spec 설정)",
+            "✅ Equipment Hierarchy 관리 (Model/Type/Configuration)",
             "✅ QC 검수 및 보고서 생성",
             "✅ 장비 유형 관리",
-            "✅ 시스템 설정 변경",
             "",
             "⚠️ 주의: 관리자 권한은 데이터 무결성에 영향을 줄 수 있습니다.",
             "   신중하게 사용하시기 바랍니다."
@@ -716,7 +711,7 @@ class DBManager:
 
         ttk.Button(
             mgmt_btn_frame,
-            text="📋 Check list 관리",
+            text="📋 QC Checklist 관리",
             command=self.open_checklist_manager,
             width=25
         ).pack(pady=5)
