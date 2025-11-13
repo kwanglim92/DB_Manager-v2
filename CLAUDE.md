@@ -221,6 +221,22 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
     - 통과율: 100%
   - 테스트 결과 문서 (`tools/test_phase1_5_week2_results.md`)
   - 수동 테스트 계획 준비 (11개 시나리오)
+- ✅ **Week 3 Day 1-2 완료** (Check list System Redesign - Database & Logic):
+  - 파일: `src/app/qc/qc_inspection_v2.py` (314 lines)
+  - 파일: `tools/test_qc_inspection_v2.py` (348 lines)
+  - ✅ QC_Checklist_Items 수정 완료 (이미 완료됨)
+    - spec_min, spec_max, expected_value 추가
+    - severity_level, is_common 제거
+  - ✅ Equipment_Checklist_Exceptions 테이블 생성 (이미 완료됨)
+  - ✅ Equipment_Checklist_Mapping 제거 (Archive 처리)
+  - ✅ qc_inspection_v2() 구현
+    - ItemName 기반 자동 매칭
+    - Configuration 예외 처리
+    - Pass/Fail 판정 (심각도 없음)
+    - Spec 범위 검증 (spec_min ~ spec_max)
+    - Expected Value 검증 (Enum, 문자열)
+    - 활성화된 항목만 검증
+  - 테스트 통과: 5/5 (100%)
 
 ### Week 2 완료 요약
 - **기간**: 5일 (Day 1-5)
@@ -228,6 +244,13 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 - **코드 추가**: ~1,400+ lines
 - **테스트 통과율**: 100% (자동 테스트)
 - **프로덕션 준비**: ⚠️ 수동 테스트 후 완료 권장
+
+### Week 3 Day 1-2 완료 요약
+- **기간**: 2일 (Day 1-2)
+- **신규 파일**: 2개 (qc_inspection_v2.py, test_qc_inspection_v2.py)
+- **코드 추가**: ~660+ lines
+- **테스트 통과율**: 100% (5/5)
+- **상태**: Database & Logic 완료, UI 작업 대기중
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
