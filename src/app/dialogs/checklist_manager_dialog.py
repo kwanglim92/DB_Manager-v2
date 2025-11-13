@@ -1,33 +1,38 @@
 """
-Check list 관리 다이얼로그
+QC Checklist Management Dialog - Phase 1.5 Week 3 Day 3
 
-관리자가 Check list를 관리할 수 있는 UI를 제공합니다.
+ItemName 기반 Check list 관리 UI
+- severity_level 제거
+- spec_min, spec_max, expected_value, category, is_active 추가
+- Import from CSV 기능
+- Active/Inactive 토글
+
+Author: Phase 1.5 Week 3
+Date: 2025-11-13
 """
 
 import tkinter as tk
-from tkinter import ttk, messagebox, simpledialog
+from tkinter import ttk, messagebox, filedialog
 import json
+import csv
 
 
 class ChecklistManagerDialog:
-    """Check list 관리 다이얼로그"""
+    """QC Checklist Management Dialog (관리자 전용)"""
 
-    def __init__(self, parent, db_schema, service_factory):
+    def __init__(self, parent, db_schema):
         """
         Args:
             parent: 부모 윈도우
             db_schema: DBSchema 인스턴스
-            service_factory: ServiceFactory 인스턴스
         """
         self.parent = parent
         self.db_schema = db_schema
-        self.service_factory = service_factory
-        self.checklist_service = service_factory.get_checklist_service()
 
         # 다이얼로그 생성
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Check list 관리")
-        self.dialog.geometry("1000x700")
+        self.dialog.title("QC Checklist 관리 (관리자 전용)")
+        self.dialog.geometry("1200x700")
         self.dialog.transient(parent)
         self.dialog.grab_set()
 
@@ -43,7 +48,7 @@ class ChecklistManagerDialog:
         # 제목
         title_label = ttk.Label(
             main_frame,
-            text="Check list 관리 (관리자 전용)",
+            text="QC Checklist 관리 (관리자 전용)",
             font=("Helvetica", 14, "bold")
         )
         title_label.pack(pady=(0, 10))
@@ -53,8 +58,7 @@ class ChecklistManagerDialog:
         self.notebook.pack(fill=tk.BOTH, expand=True)
 
         # 탭 생성
-        self._create_common_checklist_tab()
-        self._create_equipment_checklist_tab()
+        self._create_checklist_tab()
         self._create_audit_log_tab()
 
         # 버튼 프레임
@@ -68,10 +72,10 @@ class ChecklistManagerDialog:
             width=15
         ).pack()
 
-    def _create_common_checklist_tab(self):
-        """공통 Check list 탭"""
+    def _create_checklist_tab(self):
+        """QC Checklist 탭"""
         tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="공통 Check list")
+        self.notebook.add(tab, text="QC Checklist")
 
         # 상단 버튼 프레임
         btn_frame = ttk.Frame(tab)
@@ -100,8 +104,29 @@ class ChecklistManagerDialog:
 
         ttk.Button(
             btn_frame,
+            text="✅ Activate",
+            command=self._activate_item,
+            width=12
+        ).pack(side=tk.LEFT, padx=2)
+
+        ttk.Button(
+            btn_frame,
+            text="⏸️ Deactivate",
+            command=self._deactivate_item,
+            width=12
+        ).pack(side=tk.LEFT, padx=2)
+
+        ttk.Button(
+            btn_frame,
+            text="📥 Import CSV",
+            command=self._import_from_csv,
+            width=12
+        ).pack(side=tk.LEFT, padx=2)
+
+        ttk.Button(
+            btn_frame,
             text="🔄 새로고침",
-            command=self._refresh_common_checklist,
+            command=self._refresh_checklist,
             width=12
         ).pack(side=tk.LEFT, padx=2)
 
@@ -110,8 +135,8 @@ class ChecklistManagerDialog:
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # 트리뷰
-        columns = ("ID", "항목명", "패턴", "공통", "심각도", "설명")
-        self.common_tree = ttk.Treeview(
+        columns = ("ID", "ItemName", "Spec (Min~Max)", "Expected Value", "Category", "Active", "Description")
+        self.checklist_tree = ttk.Treeview(
             tree_frame,
             columns=columns,
             show="tree headings",
@@ -119,25 +144,26 @@ class ChecklistManagerDialog:
         )
 
         # 컬럼 설정
-        self.common_tree.column("#0", width=0, stretch=False)
-        self.common_tree.column("ID", width=50, anchor="center")
-        self.common_tree.column("항목명", width=200)
-        self.common_tree.column("패턴", width=250)
-        self.common_tree.column("공통", width=60, anchor="center")
-        self.common_tree.column("심각도", width=100, anchor="center")
-        self.common_tree.column("설명", width=300)
+        self.checklist_tree.column("#0", width=0, stretch=False)
+        self.checklist_tree.column("ID", width=50, anchor="center")
+        self.checklist_tree.column("ItemName", width=250)
+        self.checklist_tree.column("Spec (Min~Max)", width=150, anchor="center")
+        self.checklist_tree.column("Expected Value", width=150, anchor="center")
+        self.checklist_tree.column("Category", width=120, anchor="center")
+        self.checklist_tree.column("Active", width=70, anchor="center")
+        self.checklist_tree.column("Description", width=300)
 
         # 헤더 설정
         for col in columns:
-            self.common_tree.heading(col, text=col, anchor="center")
+            self.checklist_tree.heading(col, text=col, anchor="center")
 
         # 스크롤바
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.common_tree.yview)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.common_tree.xview)
-        self.common_tree.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
+        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.checklist_tree.yview)
+        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.checklist_tree.xview)
+        self.checklist_tree.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
 
         # 배치
-        self.common_tree.grid(row=0, column=0, sticky="nsew")
+        self.checklist_tree.grid(row=0, column=0, sticky="nsew")
         scrollbar_y.grid(row=0, column=1, sticky="ns")
         scrollbar_x.grid(row=1, column=0, sticky="ew")
 
@@ -145,71 +171,7 @@ class ChecklistManagerDialog:
         tree_frame.grid_columnconfigure(0, weight=1)
 
         # 더블클릭 이벤트
-        self.common_tree.bind("<Double-1>", lambda e: self._edit_checklist_item())
-
-    def _create_equipment_checklist_tab(self):
-        """장비별 Check list 탭"""
-        tab = ttk.Frame(self.notebook)
-        self.notebook.add(tab, text="장비별 Check list")
-
-        # 상단 프레임 - 장비 선택
-        top_frame = ttk.Frame(tab)
-        top_frame.pack(fill=tk.X, padx=5, pady=5)
-
-        ttk.Label(top_frame, text="장비 유형:").pack(side=tk.LEFT, padx=5)
-
-        self.equipment_combo = ttk.Combobox(top_frame, state="readonly", width=30)
-        self.equipment_combo.pack(side=tk.LEFT, padx=5)
-        self.equipment_combo.bind("<<ComboboxSelected>>", lambda e: self._load_equipment_checklist())
-
-        ttk.Button(
-            top_frame,
-            text="🔄 새로고침",
-            command=self._load_equipment_checklist,
-            width=12
-        ).pack(side=tk.LEFT, padx=5)
-
-        # 트리뷰 프레임
-        tree_frame = ttk.Frame(tab)
-        tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
-
-        # 트리뷰
-        columns = ("ID", "항목명", "심각도", "출처", "필수", "우선순위")
-        self.equipment_tree = ttk.Treeview(
-            tree_frame,
-            columns=columns,
-            show="tree headings",
-            selectmode="browse"
-        )
-
-        # 컬럼 설정
-        self.equipment_tree.column("#0", width=0, stretch=False)
-        self.equipment_tree.column("ID", width=50, anchor="center")
-        self.equipment_tree.column("항목명", width=250)
-        self.equipment_tree.column("심각도", width=100, anchor="center")
-        self.equipment_tree.column("출처", width=100, anchor="center")
-        self.equipment_tree.column("필수", width=80, anchor="center")
-        self.equipment_tree.column("우선순위", width=100, anchor="center")
-
-        # 헤더 설정
-        for col in columns:
-            self.equipment_tree.heading(col, text=col, anchor="center")
-
-        # 스크롤바
-        scrollbar_y = ttk.Scrollbar(tree_frame, orient=tk.VERTICAL, command=self.equipment_tree.yview)
-        scrollbar_x = ttk.Scrollbar(tree_frame, orient=tk.HORIZONTAL, command=self.equipment_tree.xview)
-        self.equipment_tree.configure(yscrollcommand=scrollbar_y.set, xscrollcommand=scrollbar_x.set)
-
-        # 배치
-        self.equipment_tree.grid(row=0, column=0, sticky="nsew")
-        scrollbar_y.grid(row=0, column=1, sticky="ns")
-        scrollbar_x.grid(row=1, column=0, sticky="ew")
-
-        tree_frame.grid_rowconfigure(0, weight=1)
-        tree_frame.grid_columnconfigure(0, weight=1)
-
-        # 장비 목록 로드
-        self._load_equipment_types()
+        self.checklist_tree.bind("<Double-1>", lambda e: self._edit_checklist_item())
 
     def _create_audit_log_tab(self):
         """Audit Log 탭"""
@@ -232,7 +194,7 @@ class ChecklistManagerDialog:
         tree_frame.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
 
         # 트리뷰
-        columns = ("ID", "작업", "대상 테이블", "사용자", "사유", "시간")
+        columns = ("ID", "작업", "대상 테이블", "대상 ID", "사용자", "사유", "시간")
         self.audit_tree = ttk.Treeview(
             tree_frame,
             columns=columns,
@@ -244,8 +206,9 @@ class ChecklistManagerDialog:
         self.audit_tree.column("#0", width=0, stretch=False)
         self.audit_tree.column("ID", width=50, anchor="center")
         self.audit_tree.column("작업", width=100, anchor="center")
-        self.audit_tree.column("대상 테이블", width=200)
-        self.audit_tree.column("사용자", width=150)
+        self.audit_tree.column("대상 테이블", width=180)
+        self.audit_tree.column("대상 ID", width=80, anchor="center")
+        self.audit_tree.column("사용자", width=120)
         self.audit_tree.column("사유", width=300)
         self.audit_tree.column("시간", width=180)
 
@@ -268,100 +231,77 @@ class ChecklistManagerDialog:
 
     def _load_data(self):
         """초기 데이터 로드"""
-        self._refresh_common_checklist()
+        self._refresh_checklist()
         self._refresh_audit_log()
 
-    def _refresh_common_checklist(self):
-        """공통 Check list 새로고침"""
+    def _refresh_checklist(self):
+        """QC Checklist 새로고침"""
         # 기존 항목 제거
-        for item in self.common_tree.get_children():
-            self.common_tree.delete(item)
+        for item in self.checklist_tree.get_children():
+            self.checklist_tree.delete(item)
 
         # 데이터 로드
         try:
-            items = self.checklist_service.get_common_checklist_items()
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, item_name, spec_min, spec_max, expected_value,
+                           category, description, is_active
+                    FROM QC_Checklist_Items
+                    ORDER BY item_name
+                """)
+                items = cursor.fetchall()
 
-            for item in items:
-                item_id = item[0]
-                item_name = item[1]
-                pattern = item[2]
-                is_common = "공통" if item[3] else "장비별"
-                severity = item[4]
-                description = item[6] if len(item) > 6 else ""
+                for item in items:
+                    item_id = item[0]
+                    item_name = item[1]
+                    spec_min = item[2]
+                    spec_max = item[3]
+                    expected_value = item[4]
+                    category = item[5] or "Uncategorized"
+                    description = item[6] or ""
+                    is_active = item[7]
 
-                # 심각도별 태그
-                tag = self._get_severity_tag(severity)
+                    # Spec 표시
+                    if spec_min and spec_max:
+                        spec_display = f"{spec_min} ~ {spec_max}"
+                    else:
+                        spec_display = "N/A"
 
-                self.common_tree.insert(
-                    "",
-                    tk.END,
-                    values=(item_id, item_name, pattern, is_common, severity, description),
-                    tags=(tag,)
-                )
+                    # Expected Value 표시
+                    if expected_value:
+                        # JSON 파싱 시도
+                        try:
+                            parsed = json.loads(expected_value)
+                            if isinstance(parsed, list):
+                                expected_display = " / ".join(str(v) for v in parsed)
+                            else:
+                                expected_display = expected_value
+                        except:
+                            expected_display = expected_value
+                    else:
+                        expected_display = "N/A"
 
-            # 태그 색상 설정
-            self.common_tree.tag_configure("critical", background="#ffcccc")
-            self.common_tree.tag_configure("high", background="#ffe6cc")
-            self.common_tree.tag_configure("medium", background="#ffffcc")
-            self.common_tree.tag_configure("low", background="#e6f7ff")
+                    # Active 표시
+                    active_display = "✓" if is_active else "✗"
 
-        except Exception as e:
-            messagebox.showerror("오류", f"Check list 로드 실패:\n{str(e)}")
+                    # 태그 설정 (Active/Inactive 색상)
+                    tag = "active" if is_active else "inactive"
 
-    def _load_equipment_types(self):
-        """장비 유형 목록 로드"""
-        try:
-            equipment_types = self.db_schema.get_equipment_types()
-            self.equipment_combo['values'] = [f"{et[0]}: {et[1]}" for et in equipment_types]
-            if equipment_types:
-                self.equipment_combo.current(0)
-                self._load_equipment_checklist()
-        except Exception as e:
-            messagebox.showerror("오류", f"장비 유형 로드 실패:\n{str(e)}")
+                    self.checklist_tree.insert(
+                        "",
+                        tk.END,
+                        values=(item_id, item_name, spec_display, expected_display,
+                               category, active_display, description),
+                        tags=(tag,)
+                    )
 
-    def _load_equipment_checklist(self):
-        """장비별 Check list 로드"""
-        # 기존 항목 제거
-        for item in self.equipment_tree.get_children():
-            self.equipment_tree.delete(item)
-
-        # 선택된 장비 ID 추출
-        selected = self.equipment_combo.get()
-        if not selected:
-            return
-
-        equipment_id = int(selected.split(":")[0])
-
-        # 데이터 로드
-        try:
-            items = self.checklist_service.get_equipment_checklist(equipment_id)
-
-            for item in items:
-                item_id = item['id']
-                item_name = item['item_name']
-                severity = item['severity_level']
-                source = item['source']
-                is_required = "필수" if item.get('is_required') else "선택"
-                priority = item.get('priority', '-')
-
-                # 심각도별 태그
-                tag = self._get_severity_tag(severity)
-
-                self.equipment_tree.insert(
-                    "",
-                    tk.END,
-                    values=(item_id, item_name, severity, source, is_required, priority),
-                    tags=(tag,)
-                )
-
-            # 태그 색상 설정
-            self.equipment_tree.tag_configure("critical", background="#ffcccc")
-            self.equipment_tree.tag_configure("high", background="#ffe6cc")
-            self.equipment_tree.tag_configure("medium", background="#ffffcc")
-            self.equipment_tree.tag_configure("low", background="#e6f7ff")
+                # 태그 색상 설정
+                self.checklist_tree.tag_configure("active", background="#e6ffe6")
+                self.checklist_tree.tag_configure("inactive", background="#ffe6e6")
 
         except Exception as e:
-            messagebox.showerror("오류", f"장비별 Check list 로드 실패:\n{str(e)}")
+            messagebox.showerror("오류", f"Checklist 로드 실패:\n{str(e)}")
 
     def _refresh_audit_log(self):
         """Audit Log 새로고침"""
@@ -371,146 +311,351 @@ class ChecklistManagerDialog:
 
         # 데이터 로드
         try:
-            logs = self.checklist_service.get_audit_log(limit=100)
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, action, target_table, target_id, reason, user, timestamp
+                    FROM Checklist_Audit_Log
+                    ORDER BY timestamp DESC
+                    LIMIT 100
+                """)
+                logs = cursor.fetchall()
 
-            for log in logs:
-                log_id = log[0]
-                action = log[1]
-                target_table = log[2]
-                user = log[7] if log[7] else "시스템"
-                reason = log[6] if log[6] else "-"
-                timestamp = log[8]
+                for log in logs:
+                    log_id = log[0]
+                    action = log[1]
+                    target_table = log[2]
+                    target_id = log[3] if log[3] else "-"
+                    reason = log[4] if log[4] else "-"
+                    user = log[5] if log[5] else "시스템"
+                    timestamp = log[6]
 
-                self.audit_tree.insert(
-                    "",
-                    tk.END,
-                    values=(log_id, action, target_table, user, reason, timestamp)
-                )
+                    self.audit_tree.insert(
+                        "",
+                        tk.END,
+                        values=(log_id, action, target_table, target_id, user, reason, timestamp)
+                    )
 
         except Exception as e:
             messagebox.showerror("오류", f"Audit Log 로드 실패:\n{str(e)}")
 
-    def _get_severity_tag(self, severity):
-        """심각도에 따른 태그 반환"""
-        severity_map = {
-            'CRITICAL': 'critical',
-            'HIGH': 'high',
-            'MEDIUM': 'medium',
-            'LOW': 'low'
-        }
-        return severity_map.get(severity, 'low')
-
     def _add_checklist_item(self):
-        """Check list 항목 추가"""
-        dialog = ChecklistItemDialog(self.dialog, self.checklist_service, mode="add")
+        """Checklist 항목 추가"""
+        dialog = ChecklistItemDialog(self.dialog, self.db_schema, mode="add")
         self.dialog.wait_window(dialog.dialog)
 
         if dialog.result:
-            self._refresh_common_checklist()
-            messagebox.showinfo("성공", "Check list 항목이 추가되었습니다.")
+            self._refresh_checklist()
+            messagebox.showinfo("성공", "Checklist 항목이 추가되었습니다.")
 
     def _edit_checklist_item(self):
-        """Check list 항목 수정"""
-        selected = self.common_tree.selection()
+        """Checklist 항목 수정"""
+        selected = self.checklist_tree.selection()
         if not selected:
             messagebox.showwarning("경고", "수정할 항목을 선택하세요.")
             return
 
-        # 선택된 항목 데이터 가져오기
-        item_values = self.common_tree.item(selected[0], 'values')
+        # 선택된 항목 ID 가져오기
+        item_values = self.checklist_tree.item(selected[0], 'values')
         item_id = int(item_values[0])
 
-        # TODO: 수정 다이얼로그 구현
-        messagebox.showinfo("알림", "Check list 항목 수정 기능은 개발 중입니다.")
+        # 기존 데이터 로드
+        try:
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT id, item_name, spec_min, spec_max, expected_value,
+                           category, description, is_active
+                    FROM QC_Checklist_Items
+                    WHERE id = ?
+                """, (item_id,))
+                item_data = cursor.fetchone()
+
+            if item_data:
+                dialog = ChecklistItemDialog(self.dialog, self.db_schema, mode="edit", item_data=item_data)
+                self.dialog.wait_window(dialog.dialog)
+
+                if dialog.result:
+                    self._refresh_checklist()
+                    messagebox.showinfo("성공", "Checklist 항목이 수정되었습니다.")
+
+        except Exception as e:
+            messagebox.showerror("오류", f"항목 로드 실패:\n{str(e)}")
 
     def _delete_checklist_item(self):
-        """Check list 항목 삭제"""
-        selected = self.common_tree.selection()
+        """Checklist 항목 삭제"""
+        selected = self.checklist_tree.selection()
         if not selected:
             messagebox.showwarning("경고", "삭제할 항목을 선택하세요.")
             return
 
         # 확인
-        if not messagebox.askyesno("확인", "선택한 Check list 항목을 삭제하시겠습니까?"):
+        if not messagebox.askyesno("확인", "선택한 Checklist 항목을 삭제하시겠습니까?\n\n이 작업은 되돌릴 수 없습니다."):
             return
 
-        # TODO: 삭제 기능 구현
-        messagebox.showinfo("알림", "Check list 항목 삭제 기능은 개발 중입니다.")
+        # 선택된 항목 ID 가져오기
+        item_values = self.checklist_tree.item(selected[0], 'values')
+        item_id = int(item_values[0])
+        item_name = item_values[1]
+
+        try:
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # Checklist 항목 삭제
+                cursor.execute("DELETE FROM QC_Checklist_Items WHERE id = ?", (item_id,))
+
+                # Audit Log 기록
+                cursor.execute("""
+                    INSERT INTO Checklist_Audit_Log
+                    (action, target_table, target_id, old_value, reason, user, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                """, ("REMOVE", "QC_Checklist_Items", item_id, item_name,
+                      "관리자에 의한 삭제", "Admin"))
+
+                conn.commit()
+
+            self._refresh_checklist()
+            self._refresh_audit_log()
+            messagebox.showinfo("성공", "Checklist 항목이 삭제되었습니다.")
+
+        except Exception as e:
+            messagebox.showerror("오류", f"삭제 실패:\n{str(e)}")
+
+    def _activate_item(self):
+        """항목 활성화"""
+        self._toggle_active(True)
+
+    def _deactivate_item(self):
+        """항목 비활성화"""
+        self._toggle_active(False)
+
+    def _toggle_active(self, is_active):
+        """항목 활성화/비활성화 토글"""
+        selected = self.checklist_tree.selection()
+        if not selected:
+            messagebox.showwarning("경고", "항목을 선택하세요.")
+            return
+
+        # 선택된 항목 ID 가져오기
+        item_values = self.checklist_tree.item(selected[0], 'values')
+        item_id = int(item_values[0])
+        item_name = item_values[1]
+
+        action_text = "활성화" if is_active else "비활성화"
+
+        try:
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+
+                # is_active 업데이트
+                cursor.execute("""
+                    UPDATE QC_Checklist_Items
+                    SET is_active = ?
+                    WHERE id = ?
+                """, (1 if is_active else 0, item_id))
+
+                # Audit Log 기록
+                cursor.execute("""
+                    INSERT INTO Checklist_Audit_Log
+                    (action, target_table, target_id, new_value, reason, user, timestamp)
+                    VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                """, ("MODIFY", "QC_Checklist_Items", item_id, f"is_active={is_active}",
+                      f"{action_text}", "Admin"))
+
+                conn.commit()
+
+            self._refresh_checklist()
+            self._refresh_audit_log()
+            messagebox.showinfo("성공", f"항목이 {action_text}되었습니다.")
+
+        except Exception as e:
+            messagebox.showerror("오류", f"{action_text} 실패:\n{str(e)}")
+
+    def _import_from_csv(self):
+        """CSV 파일에서 Checklist 항목 가져오기"""
+        # 파일 선택
+        file_path = filedialog.askopenfilename(
+            title="CSV 파일 선택",
+            filetypes=[("CSV 파일", "*.csv"), ("모든 파일", "*.*")]
+        )
+
+        if not file_path:
+            return
+
+        try:
+            imported_count = 0
+            error_count = 0
+            errors = []
+
+            with open(file_path, 'r', encoding='utf-8') as f:
+                reader = csv.DictReader(f)
+
+                # 필수 컬럼 확인
+                required_columns = ['item_name']
+                if not all(col in reader.fieldnames for col in required_columns):
+                    messagebox.showerror("오류", f"CSV 파일에 필수 컬럼이 없습니다.\n필수: {', '.join(required_columns)}")
+                    return
+
+                with self.db_schema.get_connection() as conn:
+                    cursor = conn.cursor()
+
+                    for row_num, row in enumerate(reader, start=2):
+                        try:
+                            item_name = row['item_name'].strip()
+                            if not item_name:
+                                continue
+
+                            spec_min = row.get('spec_min', '').strip() or None
+                            spec_max = row.get('spec_max', '').strip() or None
+                            expected_value = row.get('expected_value', '').strip() or None
+                            category = row.get('category', '').strip() or None
+                            description = row.get('description', '').strip() or None
+                            is_active = row.get('is_active', '1').strip()
+
+                            # is_active 변환
+                            is_active = 1 if is_active in ['1', 'true', 'True', 'TRUE', 'yes'] else 0
+
+                            # 중복 체크
+                            cursor.execute("SELECT id FROM QC_Checklist_Items WHERE item_name = ?", (item_name,))
+                            existing = cursor.fetchone()
+
+                            if existing:
+                                # 업데이트
+                                cursor.execute("""
+                                    UPDATE QC_Checklist_Items
+                                    SET spec_min = ?, spec_max = ?, expected_value = ?,
+                                        category = ?, description = ?, is_active = ?
+                                    WHERE item_name = ?
+                                """, (spec_min, spec_max, expected_value, category, description, is_active, item_name))
+                            else:
+                                # 삽입
+                                cursor.execute("""
+                                    INSERT INTO QC_Checklist_Items
+                                    (item_name, spec_min, spec_max, expected_value, category, description, is_active)
+                                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                                """, (item_name, spec_min, spec_max, expected_value, category, description, is_active))
+
+                            imported_count += 1
+
+                        except Exception as e:
+                            error_count += 1
+                            errors.append(f"행 {row_num}: {str(e)}")
+
+                    # Audit Log 기록
+                    cursor.execute("""
+                        INSERT INTO Checklist_Audit_Log
+                        (action, target_table, reason, user, timestamp)
+                        VALUES (?, ?, ?, ?, datetime('now'))
+                    """, ("ADD", "QC_Checklist_Items", f"CSV Import: {imported_count}개 항목", "Admin"))
+
+                    conn.commit()
+
+            self._refresh_checklist()
+            self._refresh_audit_log()
+
+            # 결과 메시지
+            result_msg = f"Import 완료:\n\n성공: {imported_count}개\n실패: {error_count}개"
+            if errors:
+                result_msg += f"\n\n오류 내역 (최대 5개):\n" + "\n".join(errors[:5])
+
+            messagebox.showinfo("Import 완료", result_msg)
+
+        except Exception as e:
+            messagebox.showerror("오류", f"CSV Import 실패:\n{str(e)}")
 
 
 class ChecklistItemDialog:
-    """Check list 항목 추가/수정 다이얼로그"""
+    """Checklist 항목 추가/수정 다이얼로그"""
 
-    def __init__(self, parent, checklist_service, mode="add", item_data=None):
+    def __init__(self, parent, db_schema, mode="add", item_data=None):
         """
         Args:
             parent: 부모 윈도우
-            checklist_service: ChecklistService 인스턴스
+            db_schema: DBSchema 인스턴스
             mode: "add" 또는 "edit"
-            item_data: 수정 모드일 때 기존 데이터
+            item_data: 수정 모드일 때 기존 데이터 (tuple)
         """
         self.parent = parent
-        self.checklist_service = checklist_service
+        self.db_schema = db_schema
         self.mode = mode
         self.item_data = item_data
         self.result = None
 
         # 다이얼로그 생성
         self.dialog = tk.Toplevel(parent)
-        self.dialog.title("Check list 항목 추가" if mode == "add" else "Check list 항목 수정")
+        self.dialog.title("Checklist 항목 추가" if mode == "add" else "Checklist 항목 수정")
         self.dialog.geometry("600x500")
         self.dialog.transient(parent)
         self.dialog.grab_set()
 
         self._create_ui()
 
+        # 수정 모드일 경우 기존 데이터 로드
+        if mode == "edit" and item_data:
+            self._load_existing_data()
+
     def _create_ui(self):
         """UI 생성"""
         main_frame = ttk.Frame(self.dialog, padding="20")
         main_frame.pack(fill=tk.BOTH, expand=True)
 
-        # 항목명
-        ttk.Label(main_frame, text="항목명:").grid(row=0, column=0, sticky="w", pady=5)
+        # ItemName
+        ttk.Label(main_frame, text="ItemName:").grid(row=0, column=0, sticky="w", pady=5)
         self.name_entry = ttk.Entry(main_frame, width=50)
         self.name_entry.grid(row=0, column=1, sticky="ew", pady=5, padx=(10, 0))
 
-        # 파라미터 패턴
-        ttk.Label(main_frame, text="파라미터 패턴:").grid(row=1, column=0, sticky="w", pady=5)
-        self.pattern_entry = ttk.Entry(main_frame, width=50)
-        self.pattern_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=(10, 0))
+        # Spec Min
+        ttk.Label(main_frame, text="Spec Min:").grid(row=1, column=0, sticky="w", pady=5)
+        self.spec_min_entry = ttk.Entry(main_frame, width=50)
+        self.spec_min_entry.grid(row=1, column=1, sticky="ew", pady=5, padx=(10, 0))
 
-        # 심각도
-        ttk.Label(main_frame, text="심각도:").grid(row=2, column=0, sticky="w", pady=5)
-        self.severity_combo = ttk.Combobox(
+        # Spec Max
+        ttk.Label(main_frame, text="Spec Max:").grid(row=2, column=0, sticky="w", pady=5)
+        self.spec_max_entry = ttk.Entry(main_frame, width=50)
+        self.spec_max_entry.grid(row=2, column=1, sticky="ew", pady=5, padx=(10, 0))
+
+        # Expected Value
+        ttk.Label(main_frame, text="Expected Value:").grid(row=3, column=0, sticky="w", pady=5)
+        self.expected_entry = ttk.Entry(main_frame, width=50)
+        self.expected_entry.grid(row=3, column=1, sticky="ew", pady=5, padx=(10, 0))
+
+        # Expected Value 힌트
+        hint_label = ttk.Label(
             main_frame,
-            values=["CRITICAL", "HIGH", "MEDIUM", "LOW"],
-            state="readonly",
+            text='예: ["Pass", "Fail"] (JSON 배열) 또는 "OK" (문자열)',
+            font=("Helvetica", 8),
+            foreground="gray"
+        )
+        hint_label.grid(row=4, column=1, sticky="w", padx=(10, 0))
+
+        # Category
+        ttk.Label(main_frame, text="Category:").grid(row=5, column=0, sticky="w", pady=5)
+        self.category_combo = ttk.Combobox(
+            main_frame,
+            values=["Performance", "Safety", "Configuration", "Communication", "Information", "Uncategorized"],
             width=47
         )
-        self.severity_combo.current(2)  # MEDIUM 기본값
-        self.severity_combo.grid(row=2, column=1, sticky="ew", pady=5, padx=(10, 0))
+        self.category_combo.current(0)  # Performance 기본값
+        self.category_combo.grid(row=5, column=1, sticky="ew", pady=5, padx=(10, 0))
 
-        # 설명
-        ttk.Label(main_frame, text="설명:").grid(row=3, column=0, sticky="nw", pady=5)
+        # Description
+        ttk.Label(main_frame, text="Description:").grid(row=6, column=0, sticky="nw", pady=5)
         self.desc_text = tk.Text(main_frame, width=50, height=5)
-        self.desc_text.grid(row=3, column=1, sticky="ew", pady=5, padx=(10, 0))
+        self.desc_text.grid(row=6, column=1, sticky="ew", pady=5, padx=(10, 0))
 
-        # 검증 규칙 (JSON)
-        ttk.Label(main_frame, text="검증 규칙 (JSON):").grid(row=4, column=0, sticky="nw", pady=5)
-        self.rule_text = tk.Text(main_frame, width=50, height=6)
-        self.rule_text.grid(row=4, column=1, sticky="ew", pady=5, padx=(10, 0))
-
-        # 기본값 설정
-        default_rule = '''{
-  "type": "range",
-  "min": 0,
-  "max": 100
-}'''
-        self.rule_text.insert("1.0", default_rule)
+        # Active 체크박스
+        self.active_var = tk.BooleanVar(value=True)
+        self.active_check = ttk.Checkbutton(
+            main_frame,
+            text="Active (활성화)",
+            variable=self.active_var
+        )
+        self.active_check.grid(row=7, column=1, sticky="w", pady=5, padx=(10, 0))
 
         # 버튼 프레임
         btn_frame = ttk.Frame(main_frame)
-        btn_frame.grid(row=5, column=0, columnspan=2, pady=(20, 0))
+        btn_frame.grid(row=8, column=0, columnspan=2, pady=(20, 0))
 
         ttk.Button(
             btn_frame,
@@ -528,48 +673,109 @@ class ChecklistItemDialog:
 
         main_frame.grid_columnconfigure(1, weight=1)
 
+    def _load_existing_data(self):
+        """기존 데이터 로드 (수정 모드)"""
+        if not self.item_data:
+            return
+
+        # item_data: (id, item_name, spec_min, spec_max, expected_value, category, description, is_active)
+        self.name_entry.insert(0, self.item_data[1] or "")
+        self.spec_min_entry.insert(0, self.item_data[2] or "")
+        self.spec_max_entry.insert(0, self.item_data[3] or "")
+        self.expected_entry.insert(0, self.item_data[4] or "")
+
+        category = self.item_data[5] or "Uncategorized"
+        self.category_combo.set(category)
+
+        description = self.item_data[6] or ""
+        self.desc_text.insert("1.0", description)
+
+        is_active = self.item_data[7]
+        self.active_var.set(bool(is_active))
+
+        # 수정 모드에서는 ItemName 변경 불가
+        self.name_entry.config(state="readonly")
+
     def _save(self):
         """저장"""
         # 입력 값 가져오기
         item_name = self.name_entry.get().strip()
-        pattern = self.pattern_entry.get().strip()
-        severity = self.severity_combo.get()
-        description = self.desc_text.get("1.0", tk.END).strip()
-        validation_rule = self.rule_text.get("1.0", tk.END).strip()
+        spec_min = self.spec_min_entry.get().strip() or None
+        spec_max = self.spec_max_entry.get().strip() or None
+        expected_value = self.expected_entry.get().strip() or None
+        category = self.category_combo.get().strip() or None
+        description = self.desc_text.get("1.0", tk.END).strip() or None
+        is_active = 1 if self.active_var.get() else 0
 
         # 유효성 검사
         if not item_name:
-            messagebox.showwarning("경고", "항목명을 입력하세요.")
+            messagebox.showwarning("경고", "ItemName을 입력하세요.")
             return
 
-        if not pattern:
-            messagebox.showwarning("경고", "파라미터 패턴을 입력하세요.")
+        # Spec 검증: Min과 Max는 함께 입력되어야 함
+        if (spec_min and not spec_max) or (not spec_min and spec_max):
+            messagebox.showwarning("경고", "Spec Min과 Max는 함께 입력해야 합니다.")
             return
 
-        # JSON 검증
-        if validation_rule:
+        # Expected Value JSON 검증
+        if expected_value:
             try:
-                json.loads(validation_rule)
-            except json.JSONDecodeError as e:
-                messagebox.showerror("오류", f"검증 규칙 JSON 형식 오류:\n{str(e)}")
-                return
+                # JSON 파싱 시도
+                json.loads(expected_value)
+            except json.JSONDecodeError:
+                # JSON이 아니면 단순 문자열로 처리 (오류 아님)
+                pass
 
         # 저장
         try:
-            result = self.checklist_service.add_checklist_item(
-                item_name=item_name,
-                parameter_pattern=pattern,
-                is_common=True,
-                severity_level=severity,
-                validation_rule=validation_rule if validation_rule else None,
-                description=description
-            )
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
 
-            if result:
-                self.result = result
-                self.dialog.destroy()
-            else:
-                messagebox.showerror("오류", "Check list 항목 추가 실패 (이미 존재하는 항목일 수 있습니다)")
+                if self.mode == "add":
+                    # 중복 체크
+                    cursor.execute("SELECT id FROM QC_Checklist_Items WHERE item_name = ?", (item_name,))
+                    if cursor.fetchone():
+                        messagebox.showerror("오류", f"'{item_name}' 항목이 이미 존재합니다.")
+                        return
+
+                    # 삽입
+                    cursor.execute("""
+                        INSERT INTO QC_Checklist_Items
+                        (item_name, spec_min, spec_max, expected_value, category, description, is_active)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    """, (item_name, spec_min, spec_max, expected_value, category, description, is_active))
+
+                    new_id = cursor.lastrowid
+
+                    # Audit Log 기록
+                    cursor.execute("""
+                        INSERT INTO Checklist_Audit_Log
+                        (action, target_table, target_id, new_value, reason, user, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                    """, ("ADD", "QC_Checklist_Items", new_id, item_name, "신규 항목 추가", "Admin"))
+
+                else:  # edit
+                    item_id = self.item_data[0]
+
+                    # 업데이트
+                    cursor.execute("""
+                        UPDATE QC_Checklist_Items
+                        SET spec_min = ?, spec_max = ?, expected_value = ?,
+                            category = ?, description = ?, is_active = ?
+                        WHERE id = ?
+                    """, (spec_min, spec_max, expected_value, category, description, is_active, item_id))
+
+                    # Audit Log 기록
+                    cursor.execute("""
+                        INSERT INTO Checklist_Audit_Log
+                        (action, target_table, target_id, new_value, reason, user, timestamp)
+                        VALUES (?, ?, ?, ?, ?, ?, datetime('now'))
+                    """, ("MODIFY", "QC_Checklist_Items", item_id, item_name, "항목 수정", "Admin"))
+
+                conn.commit()
+
+            self.result = True
+            self.dialog.destroy()
 
         except Exception as e:
             messagebox.showerror("오류", f"저장 실패:\n{str(e)}")
