@@ -232,6 +232,27 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
   - ✅ qc_inspection_v2() 구현
     - ItemName 기반 자동 매칭
     - Configuration 예외 처리
+- ✅ **Week 3 Day 3 완료** (QC Checklist Management Dialog):
+  - 파일: `src/app/dialogs/checklist_manager_dialog.py` (완전 재작성, 782 lines)
+  - 파일: `src/app/manager.py` (open_checklist_manager 메서드 수정)
+  - ✅ QC Checklist Management Dialog 구현
+    - severity_level 제거 (심각도 시스템 폐지)
+    - spec_min, spec_max, expected_value, category, is_active 추가
+    - 장비별 Check list 탭 제거 (ItemName 자동 매칭으로 대체)
+    - Active/Inactive 토글 기능
+  - ✅ CRUD 기능 완료
+    - Add: ChecklistItemDialog (ItemName, Spec, Expected Value, Category, Description, Active)
+    - Edit: 기존 데이터 로드 및 수정 (ItemName 변경 불가)
+    - Delete: Audit Log 기록
+    - Activate/Deactivate: is_active 토글
+  - ✅ Import from CSV 기능
+    - 필수 컬럼: item_name
+    - 선택 컬럼: spec_min, spec_max, expected_value, category, description, is_active
+    - 중복 항목 자동 업데이트
+  - ✅ manager.py 통합
+    - open_checklist_manager() 업데이트 (db_schema만 사용)
+    - show_admin_features_dialog() 업데이트 ("QC Checklist 관리" 메뉴)
+  - 테스트: Syntax 및 Import 검증 완료
     - Pass/Fail 판정 (심각도 없음)
     - Spec 범위 검증 (spec_min ~ spec_max)
     - Expected Value 검증 (Enum, 문자열)
@@ -251,6 +272,18 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 - **코드 추가**: ~660+ lines
 - **테스트 통과율**: 100% (5/5)
 - **상태**: Database & Logic 완료, UI 작업 대기중
+
+### Week 3 Day 3 완료 요약
+- **기간**: 1일 (Day 3)
+- **수정 파일**: 2개 (checklist_manager_dialog.py 완전 재작성, manager.py 수정)
+- **코드 추가/수정**: ~800+ lines
+- **테스트**: Syntax 및 Import 검증 완료
+- **상태**: QC Checklist Management UI 완료, manager.py 통합 완료
+
+**주요 구현**:
+- QC Checklist Management Dialog (CRUD + Active/Inactive + Import CSV)
+- ChecklistItemDialog (Add/Edit 모드)
+- manager.py 통합 (관리자 모드에서 접근 가능)
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
