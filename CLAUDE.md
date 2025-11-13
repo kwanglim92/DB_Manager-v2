@@ -107,13 +107,13 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 ## 전체 프로젝트 진행 상황
 
-### 🎯 전체 로드맵 진행도: **약 50%**
+### 🎯 전체 로드맵 진행도: **약 53%**
 
 | Phase | 목표 | 상태 | 진행률 | 완료일 |
 |-------|------|------|--------|--------|
 | **Phase 0** | 기본 시스템 구축 | ✅ 완료 | 100% | 2024년 |
 | **Phase 1** | Check list 기반 QC 강화 | ✅ 완료 | 100% | 2025-11-01 |
-| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 50% | 2025-11-13 시작 |
+| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 60% | 2025-11-13 시작 |
 | **Phase 2** | Raw Data Management | ⏳ 계획 | 0% | Phase 1.5 완료 후 |
 | **Phase 3** | 모듈 기반 아키텍처 | 📋 예정 | 0% | 향후 6-12개월 |
 | **Phase 4** | AI 기반 예측/최적화 | 📋 예정 | 0% | TBD |
@@ -201,9 +201,21 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
   - Description 텍스트 영역
   - EquipmentHierarchyDialog 통합 (Add/Edit Configuration)
   - main.py 관리자 메뉴 추가 ("🏗️ Equipment Hierarchy 관리")
-- 🔄 **Week 2 Day 4 준비중** (Default DB Management 개선):
-  - Configuration별 Default DB 관리
-  - Type 공통 Default DB vs Configuration별 Override
+- ✅ **Week 2 Day 4 완료** (Default DB Management 개선):
+  - Configuration 선택 UI 추가 (Combobox + Mode 레이블)
+  - Configuration별 vs Type Common 구분 표시
+    - Scope 컬럼 추가 (Type Common / Configuration)
+    - _load_configurations_for_type() 메서드
+    - on_configuration_selected() 메서드
+    - ConfigurationService.get_default_values_by_configuration() 연동
+  - Convert 기능 UI 추가 (우클릭 메뉴)
+    - Convert to Type Common (미구현, TODO)
+    - Convert to Configuration-specific (미구현, TODO)
+    - 권한 검증 (admin_mode 필요)
+    - Scope 확인 및 유효성 검사
+- 🔄 **Week 2 Day 5 준비중** (Integration & Testing):
+  - UI/Service 통합 테스트
+  - End-to-End workflow test
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 

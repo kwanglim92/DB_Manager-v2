@@ -4873,17 +4873,28 @@ class DBManager:
 
 
     def create_default_db_context_menu(self):
-        """Default DB 트리뷰용 우클릭 메뉴 생성 - Check list 관리 전용"""
+        """Default DB 트리뷰용 우클릭 메뉴 생성 - Check list 관리 + Phase 1.5 Convert"""
         self.default_db_context_menu = tk.Menu(self.window, tearoff=0)
-        
-        # Check list 관련 메뉴만 유지 (엔지니어링 스타일)
+
+        # Check list 관련 메뉴 (엔지니어링 스타일)
         self.default_db_context_menu.add_command(
-            label="Set as Check list", 
+            label="Set as Check list",
             command=lambda: self.set_performance_status(True)
         )
         self.default_db_context_menu.add_command(
-            label="Remove Check list", 
+            label="Remove Check list",
             command=lambda: self.set_performance_status(False)
+        )
+
+        # Phase 1.5: Configuration별 Scope 전환 메뉴
+        self.default_db_context_menu.add_separator()
+        self.default_db_context_menu.add_command(
+            label="Convert to Type Common",
+            command=self.convert_to_type_common
+        )
+        self.default_db_context_menu.add_command(
+            label="Convert to Configuration-specific",
+            command=self.convert_to_configuration_specific
         )
 
     def show_default_db_context_menu(self, event):
@@ -4965,6 +4976,102 @@ class DBManager:
             self.on_equipment_type_selected()
         except Exception as e:
             self.update_log(f"Performance 필터 적용 오류: {e}")
+
+    def convert_to_type_common(self):
+        """Phase 1.5: Configuration-specific 파라미터를 Type Common으로 변환"""
+        try:
+            if not self.admin_mode:
+                messagebox.showwarning("권한 없음", "관리자 모드에서만 Scope 전환이 가능합니다.")
+                return
+
+            # Configuration 모드인지 확인
+            if not hasattr(self, 'current_selected_config_id') or self.current_selected_config_id is None:
+                messagebox.showwarning("알림", "Configuration을 선택한 상태에서만 Scope 전환이 가능합니다.\n'All (Type Common)' 모드에서는 이미 모든 파라미터가 Type Common입니다.")
+                return
+
+            selected_items = self.default_db_tree.selection()
+            if not selected_items:
+                messagebox.showwarning("선택 필요", "Type Common으로 전환할 파라미터를 선택해주세요.")
+                return
+
+            # 선택된 파라미터의 Scope 확인
+            item = selected_items[0]
+            values = self.default_db_tree.item(item, 'values')
+            current_scope = values[2]  # Scope 컬럼 (인덱스 2)
+
+            if current_scope == "Type Common":
+                messagebox.showinfo("알림", "선택한 파라미터는 이미 Type Common입니다.")
+                return
+
+            # 확인 다이얼로그
+            confirm = messagebox.askyesno(
+                "Scope 전환 확인",
+                f"선택한 {len(selected_items)}개의 파라미터를 Type Common으로 전환하시겠습니까?\n\n"
+                "이 작업은 현재 Configuration의 파라미터를 삭제하고,\n"
+                "Equipment Type 수준의 공통 파라미터로 변경합니다.",
+                icon='warning'
+            )
+
+            if not confirm:
+                return
+
+            # TODO: ConfigurationService.convert_to_type_common() 구현 필요
+            messagebox.showinfo("구현 예정", "Convert to Type Common 기능은 추후 구현 예정입니다.\n(Phase 1.5 Week 2 Day 4 완료 후)")
+            self.update_log("📌 Convert to Type Common 기능 호출됨 (미구현)")
+
+        except Exception as e:
+            error_msg = f"Type Common 전환 오류: {e}"
+            self.update_log(f"❌ {error_msg}")
+            messagebox.showerror("오류", error_msg)
+
+    def convert_to_configuration_specific(self):
+        """Phase 1.5: Type Common 파라미터를 Configuration-specific으로 변환"""
+        try:
+            if not self.admin_mode:
+                messagebox.showwarning("권한 없음", "관리자 모드에서만 Scope 전환이 가능합니다.")
+                return
+
+            # Configuration 모드인지 확인
+            if not hasattr(self, 'current_selected_config_id') or self.current_selected_config_id is None:
+                messagebox.showwarning("알림", "Configuration을 선택한 상태에서만 Scope 전환이 가능합니다.\n'All (Type Common)' 모드에서는 Configuration-specific으로 전환할 수 없습니다.")
+                return
+
+            selected_items = self.default_db_tree.selection()
+            if not selected_items:
+                messagebox.showwarning("선택 필요", "Configuration-specific으로 전환할 파라미터를 선택해주세요.")
+                return
+
+            # 선택된 파라미터의 Scope 확인
+            item = selected_items[0]
+            values = self.default_db_tree.item(item, 'values')
+            current_scope = values[2]  # Scope 컬럼 (인덱스 2)
+
+            if current_scope == "Configuration":
+                messagebox.showinfo("알림", "선택한 파라미터는 이미 Configuration-specific입니다.")
+                return
+
+            # 확인 다이얼로그
+            config_name = self.configuration_var.get()
+            confirm = messagebox.askyesno(
+                "Scope 전환 확인",
+                f"선택한 {len(selected_items)}개의 파라미터를 Configuration-specific으로 전환하시겠습니까?\n\n"
+                f"대상 Configuration: {config_name}\n\n"
+                "이 작업은 Type Common 파라미터를 현재 Configuration 전용으로 변경합니다.\n"
+                "다른 Configuration에서는 더 이상 이 파라미터를 볼 수 없습니다.",
+                icon='warning'
+            )
+
+            if not confirm:
+                return
+
+            # TODO: ConfigurationService.convert_to_configuration_specific() 구현 필요
+            messagebox.showinfo("구현 예정", "Convert to Configuration-specific 기능은 추후 구현 예정입니다.\n(Phase 1.5 Week 2 Day 4 완료 후)")
+            self.update_log("📌 Convert to Configuration-specific 기능 호출됨 (미구현)")
+
+        except Exception as e:
+            error_msg = f"Configuration-specific 전환 오류: {e}"
+            self.update_log(f"❌ {error_msg}")
+            messagebox.showerror("오류", error_msg)
 
     def get_selected_db_ids(self):
         """선택된 트리뷰 항목들의 실제 DB ID를 반환합니다."""
