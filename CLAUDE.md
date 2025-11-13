@@ -107,13 +107,13 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 ## 전체 프로젝트 진행 상황
 
-### 🎯 전체 로드맵 진행도: **약 40%**
+### 🎯 전체 로드맵 진행도: **약 43%**
 
 | Phase | 목표 | 상태 | 진행률 | 완료일 |
 |-------|------|------|--------|--------|
 | **Phase 0** | 기본 시스템 구축 | ✅ 완료 | 100% | 2024년 |
 | **Phase 1** | Check list 기반 QC 강화 | ✅ 완료 | 100% | 2025-11-01 |
-| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 35% | 2025-11-13 시작 |
+| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 43% | 2025-11-13 시작 |
 | **Phase 2** | Raw Data Management | ⏳ 계획 | 0% | Phase 1.5 완료 후 |
 | **Phase 3** | 모듈 기반 아키텍처 | 📋 예정 | 0% | 향후 6-12개월 |
 | **Phase 4** | AI 기반 예측/최적화 | 📋 예정 | 0% | TBD |
@@ -182,10 +182,18 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
     - CategoryService 등록 (ICategoryService)
     - ConfigurationService 등록 (IConfigurationService)
     - Getter 메서드 추가 (get_category_service, get_configuration_service)
-- 🔄 **Week 2 준비중** (Equipment Hierarchy Tree View UI):
-  - Tree View 컴포넌트 설계 (3 levels: Model → Type → Configuration)
-  - Add/Edit/Delete 다이얼로그 설계
-  - Configuration 관리 다이얼로그 (Port/Wafer 드롭다운)
+- ✅ **Week 2 Day 1-2 완료** (Equipment Hierarchy Tree View UI):
+  - 파일: `src/app/dialogs/equipment_hierarchy_dialog.py` (600+ lines)
+  - Tkinter Treeview 컴포넌트 구현 (3단계 계층)
+  - 아이콘 및 색상 구분 (📁 Model, 🔧 Type, ⚙️ Configuration)
+  - 우클릭 메뉴 (Add/Edit/Delete)
+  - CategoryService/ConfigurationService 통합
+  - Model/Type/Configuration CRUD 기능
+  - Customer-Specific Configuration 표시 (⚙️🌟)
+- 🔄 **Week 2 Day 3 준비중** (Configuration Management Dialog):
+  - Add Configuration Dialog (Port/Wafer 드롭다운)
+  - Custom Options JSON 편집기
+  - Customer-specific 플래그
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
