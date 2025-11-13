@@ -45,7 +45,48 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 - End-to-End: 11/11
 - 성능: 5/5
 
-### Phase 2: 모듈 기반 아키텍처 ⏳ **계획** (향후 6-12개월)
+### Phase 1.5: Equipment Hierarchy System 🚧 **진행중** (2025-11-13 시작, 예상 2-3주)
+**목표**: 모델명 기반 3단계 장비 계층 구조 구축
+
+**핵심 변경**:
+- **계층 구조**: Model (최상위) → Type (AE 형태) → Configuration (Port + Wafer + 커스텀)
+- **ItemName 자동 매칭**: Check list 단일 마스터, Configuration별 매핑 제거
+- **Spec 분리**: Default DB = Cal 값만, QC Check list = Spec 관리
+
+**신규 테이블** (3개):
+- `Equipment_Models` - 장비 모델명 (NX-Hybrid WLI, NX-Mask, NX-eView)
+- `Equipment_Configurations` - Port 구성 + Wafer 크기 + 커스텀 옵션
+- `Equipment_Checklist_Exceptions` - Configuration별 Check list 예외 관리
+
+**수정 테이블** (3개):
+- `Equipment_Types` - model_id FK 추가, type_name → AE 형태
+- `Default_DB_Values` - configuration_id FK 추가, **min_spec/max_spec 제거**
+- `QC_Checklist_Items` - **severity_level 제거**, spec 필드 추가
+
+**제거 테이블** (1개):
+- `Equipment_Checklist_Mapping` - ItemName 자동 매칭으로 대체
+
+**주요 기능**:
+- 3단계 Equipment Hierarchy Tree View UI
+- Configuration 관리 (Port/Wafer 드롭다운, 휴먼 에러 방지)
+- QC Check list ItemName 기반 자동 매칭 (Pass/Fail 판정만)
+- Configuration별 Check list 예외 관리
+
+### Phase 2: Raw Data Management ⏳ **계획** (Phase 1.5 완료 후, 예상 2-3주)
+**목표**: 출고 장비 데이터 추적 및 Raw Data 관리
+
+**신규 테이블** (2개):
+- `Shipped_Equipment` - 출고 장비 메타데이터 (시리얼, 고객, 리핏 추적)
+- `Shipped_Equipment_Parameters` - 출고 장비 Raw Data (2000+ 파라미터)
+
+**주요 기능**:
+- 파일 임포트 (파일명 파싱: `{Serial}_{Customer}_{Model}.txt`)
+- Configuration 자동/수동 매칭
+- 리핏 오더 추적 (원본 시리얼 번호)
+- test 폴더 일괄 임포트 (50+ 파일)
+- 출고 데이터 통계 및 분석 (향후 Default DB 자동 업데이트 기반)
+
+### Phase 3: 모듈 기반 아키텍처 📋 **예정** (향후 6-12개월)
 **목표**: 장비 구성(모듈 조합) 기반 동적 DB 생성
 
 **계획된 기능**:
@@ -57,11 +98,10 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 **신규 테이블**:
 - `Equipment_Modules`
-- `Equipment_Configurations`
-- `Config_Module_Mapping`
 - `Module_Parameters`
+- `Config_Module_Mapping`
 
-**Phase 1 기반**: Check list 시스템, 권한 시스템, Audit Trail을 활용하여 모듈 기반 자동화 구축
+**Phase 1.5-2 기반**: Equipment Hierarchy, Raw Data를 활용하여 모듈 기반 자동화 구축
 
 ---
 
@@ -73,8 +113,10 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 |-------|------|------|--------|--------|
 | **Phase 0** | 기본 시스템 구축 | ✅ 완료 | 100% | 2024년 |
 | **Phase 1** | Check list 기반 QC 강화 | ✅ 완료 | 100% | 2025-11-01 |
-| **Phase 2** | 모듈 기반 아키텍처 | ⏳ 계획 | 0% | 예상 6-12개월 |
-| **Phase 3** | AI 기반 예측/최적화 | 📋 예정 | 0% | TBD |
+| **Phase 1.5** | Equipment Hierarchy System | 🚧 진행중 | 35% | 2025-11-13 시작 |
+| **Phase 2** | Raw Data Management | ⏳ 계획 | 0% | Phase 1.5 완료 후 |
+| **Phase 3** | 모듈 기반 아키텍처 | 📋 예정 | 0% | 향후 6-12개월 |
+| **Phase 4** | AI 기반 예측/최적화 | 📋 예정 | 0% | TBD |
 
 ### Phase 0: 기본 시스템 (완료)
 - ✅ 파일 비교 엔진
@@ -98,9 +140,71 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 - 성능: 기준 대비 257배 (캐시), 17배 (처리량)
 - 테스트 커버리지: 100%
 
-### Phase 2: 모듈 기반 아키텍처 (계획)
+### Phase 1.5: Equipment Hierarchy System (진행중)
 **예상 작업량**:
-- 신규 테이블: 4개
+- 신규 테이블: 3개 (Equipment_Models, Equipment_Configurations, Equipment_Checklist_Exceptions)
+- 수정 테이블: 3개 (Equipment_Types, Default_DB_Values, QC_Checklist_Items)
+- 제거 테이블: 1개 (Equipment_Checklist_Mapping)
+- 신규 서비스: 2개 (CategoryService, ConfigurationService)
+- UI 컴포넌트: 3개 (Hierarchy Tree View, Configuration Dialog, Exception Dialog)
+- 예상 기간: 2-3주 (6주 로드맵 중 Week 1-3)
+
+**주요 마일스톤**:
+1. Week 1: Database Migration + Service Layer
+2. Week 2: Equipment Hierarchy Tree View UI
+3. Week 3: Check list System Redesign (ItemName 자동 매칭)
+
+**진행 상황** (2025-11-13 업데이트):
+- ✅ **Week 1 Day 1-2 완료** (Database Migration):
+  - `tools/migrate_phase1_5.py` 작성 (700+ lines)
+  - 7단계 마이그레이션 로직 (Equipment_Models, Equipment_Types, Equipment_Configurations 등)
+  - Dry run 테스트 통과
+  - 실제 마이그레이션 성공 (백업: `data/backups/pre_phase1_5_backup_*.sqlite`)
+  - 검증 완료: 8개 Equipment_Models 생성, FK 관계 정상, 데이터 무결성 확인
+- ✅ **Week 1 Day 3-5 완료** (Service Layer):
+  - ✅ CategoryService 인터페이스 및 구현 (220 lines + 670 lines)
+    - 파일: `src/app/services/interfaces/category_service_interface.py`
+    - 파일: `src/app/services/category/category_service.py`
+    - Equipment Models CRUD (get_all, create, update, delete, reorder)
+    - Equipment Types CRUD (get_by_model, create, update, delete)
+    - Hierarchy operations (get_hierarchy_tree)
+    - Search and validation methods
+  - ✅ ConfigurationService 인터페이스 및 구현 (380 lines + 1000 lines)
+    - 파일: `src/app/services/interfaces/configuration_service_interface.py`
+    - 파일: `src/app/services/configuration/configuration_service.py`
+    - Equipment Configurations CRUD (Port/Wafer 검증)
+    - Custom options JSON 관리
+    - Customer-specific configurations
+    - Default DB Values CRUD (Configuration별 + Type 공통)
+    - Hierarchy operations (get_configuration_hierarchy, get_full_hierarchy)
+    - Bulk create 지원
+  - ✅ ServiceFactory 업데이트
+    - CategoryService 등록 (ICategoryService)
+    - ConfigurationService 등록 (IConfigurationService)
+    - Getter 메서드 추가 (get_category_service, get_configuration_service)
+- 🔄 **Week 2 준비중** (Equipment Hierarchy Tree View UI):
+  - Tree View 컴포넌트 설계 (3 levels: Model → Type → Configuration)
+  - Add/Edit/Delete 다이얼로그 설계
+  - Configuration 관리 다이얼로그 (Port/Wafer 드롭다운)
+
+**참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
+
+### Phase 2: Raw Data Management (계획)
+**예상 작업량**:
+- 신규 테이블: 2개 (Shipped_Equipment, Shipped_Equipment_Parameters)
+- 신규 서비스: 1개 (ShippedEquipmentService)
+- UI 컴포넌트: 2개 (Shipped Equipment List, Import Dialog)
+- 예상 기간: 2-3주 (6주 로드맵 중 Week 4-5)
+
+**주요 마일스톤**:
+1. Week 4: Shipped Equipment Service + Import Logic
+2. Week 5: Bulk Import from test Folder (50+ 파일)
+
+**참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
+
+### Phase 3: 모듈 기반 아키텍처 (예정)
+**예상 작업량**:
+- 신규 테이블: 3개
 - 신규 서비스: 2-3개
 - UI 컴포넌트: 3-5개
 - 예상 기간: 6-12개월
@@ -112,7 +216,7 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 4. 모듈별 Check list 자동 적용
 5. 검증 및 최적화
 
-### Phase 3: AI 기반 예측/최적화 (미정)
+### Phase 4: AI 기반 예측/최적화 (미정)
 - DB 적합성 자동 예측
 - 리스크 분석 및 경고
 - 최적 구성 추천
@@ -396,6 +500,24 @@ with self.db_schema.get_connection() as conn:
    - 커스텀 검증 규칙
    - 우선순위 설정
 5. **Audit Log 확인**: 모든 변경 이력 추적
+
+### Default DB 관리
+1. **관리자 모드 진입** (도움말 → 🔐 Maintenance, 비밀번호: 1234)
+2. **장비 유형 선택** (Equipment Type Combobox)
+   - Add Equipment Type: 새 장비 유형 추가
+   - Delete: 선택한 장비 유형 삭제
+   - Refresh: 장비 유형 목록 새로고침
+3. **파라미터 관리** (4가지 방법):
+   - **수동 추가**: Add Parameter → 다이얼로그에서 직접 입력
+   - **일괄 가져오기**: Import from Text File → 텍스트 파일에서 가져오기
+   - **비교에서 추가**: 파일 비교 탭 → 항목 선택 → 우클릭 → "선택한 항목을 Default DB에 추가"
+     - 통계 분석 기반 기준값 자동 도출
+     - 신뢰도 임계값 설정 (기본: 50%, 과반수 이상)
+   - **내보내기**: Export to Text File → 텍스트 파일로 저장
+4. **파라미터 수정/삭제**:
+   - 트리뷰에서 파라미터 선택 → 우클릭 → 수정/삭제
+   - Delete Selected: 다중 선택 삭제
+5. **필터 및 검색**: 파라미터 이름/모듈/파트별 필터링
 
 ## 테스트
 
@@ -951,39 +1073,61 @@ src/app/
 - Phase 1 테스트 스위트 (20개 테스트)
 - 상세한 비교 문서 (향후 참고 자료)
 
-### 7. 프로젝트 현재 상태
+### 7. 프로젝트 현재 상태 (2025-11-13)
 
-**안정성**: ✅ 양호
-- main.py: 정상 작동 (5,070 lines)
-- main_optimized.py: 정상 작동 (11개 파일)
-- Phase 1 기능: 완벽 작동 (양쪽 모두)
-- 데이터베이스: 무결성 유지
+**안정성**: ✅ 우수
+- main.py: 정상 작동 (5,070 lines, Phase 1 통합 완료)
+- Phase 1 기능: 완벽 작동 (Check list 시스템)
+- 데이터베이스: 무결성 유지 (6개 테이블)
+- 모든 테스트 통과: 20/20 (100%)
 
-**문서화**: ✅ 우수
-- 구현 문서: 완료
-- 진행 상황: 완료
-- 시스템 비교: 완료
-- 프로젝트 현황: 완료
+**문서화**: ✅ 완료
+- PHASE1_IMPLEMENTATION.md (Phase 1 구현 상세)
+- PHASE1_PROGRESS.md (Phase 1 진행 상황)
+- PROJECT_STATUS.md (전체 프로젝트 현황)
+- PHASE1.5-2_IMPLEMENTATION_PLAN.md (Phase 1.5-2 계획, 2025-11-13 작성)
 
-**기술 부채**: ⚠️ 증가
-- 두 진입점 존재 (혼란 가능성)
-- main_optimized.py 활용 방안 불명확
-- 코드베이스 복잡도 증가
+**기술 부채**: ✅ 정리 완료
+- main_optimized.py 제거 완료 (단일 시스템)
+- 점진적 최적화 계획 수립 (긴 메서드 분할, 중복 제거)
 
-**다음 단계**: ⏳ 대기
-- **즉시**: 사용자 결정 필요 (옵션 A/B/C 선택)
-- **복구 후**: Phase 2 준비 (모듈 기반 시스템)
-- **장기**: 레거시 시스템 점진적 개선
+**진행중**: 🚧 Phase 1.5 (Equipment Hierarchy System)
+- 2025-11-13 시작
+- 예상 기간: 2-3주
+- 참조 문서: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
-**우선순위**:
-1. **P0 (긴급)**: 복구 방향 확정
-2. **P1 (높음)**: 선택한 옵션 실행
-3. **P2 (보통)**: 문서 정리 및 최종 검증
-4. **P3 (낮음)**: Phase 2 계획 수립
+**다음 단계**: ⏳ Phase 1.5 → Phase 2 → Phase 3
+1. **Week 1**: Database Migration + Service Layer
+2. **Week 2**: Equipment Hierarchy Tree View UI
+3. **Week 3**: Check list System Redesign
+4. **Week 4-5**: Raw Data Management (Phase 2)
+5. **Week 6**: Integration & Testing
 
 ---
 
 ## 문서 업데이트 이력
+
+### 2025-11-13 (Phase 1.5-2 시작)
+- **Phase 1.5 시작**: Equipment Hierarchy System 구현 시작
+- **로드맵 재구성**: Phase 2를 Phase 1.5 + Phase 2 + Phase 3으로 분리
+  - Phase 1.5: Equipment Hierarchy (Model → Type → Configuration)
+  - Phase 2: Raw Data Management (Shipped Equipment)
+  - Phase 3: 모듈 기반 아키텍처 (기존 Phase 2)
+  - Phase 4: AI 기반 예측/최적화 (기존 Phase 3)
+- **핵심 설계 결정**:
+  - 모델명을 최상위 계층으로 (기존: AE 형태)
+  - ItemName 기반 Check list 자동 매칭 (Configuration별 매핑 제거)
+  - Spec 분리: Default DB = Cal 값만, QC Check list = Spec 관리
+  - Equipment_Checklist_Mapping 테이블 제거
+- **CLAUDE.md 업데이트**:
+  - Phase 1.5-2 섹션 추가
+  - 전체 로드맵 진행도 테이블 업데이트
+  - 프로젝트 현재 상태 업데이트
+- **신규 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md` (58KB, 1000+ lines)
+  - 6주 구현 로드맵
+  - 상세 DB 스키마 설계
+  - 마이그레이션 전략
+  - UI 설계
 
 ### 2025-11-06 (QC 엔지니어 vs 관리자 권한 분리)
 - **권한 시스템 개선**: QC 엔지니어와 관리자 모드 명확한 분리

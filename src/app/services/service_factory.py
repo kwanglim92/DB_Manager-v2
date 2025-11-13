@@ -17,10 +17,14 @@ from .interfaces.equipment_service_interface import IEquipmentService, IParamete
 from .interfaces.data_service_interface import IDataProcessingService, IFileService
 from .interfaces.validation_service_interface import IValidationService, IQCService
 from .interfaces.checklist_service_interface import IChecklistService
+from .interfaces.category_service_interface import ICategoryService
+from .interfaces.configuration_service_interface import IConfigurationService
 
 # 구현체들
 from .equipment.equipment_service import EquipmentService
 from .checklist.checklist_service import ChecklistService
+from .category.category_service import CategoryService
+from .configuration.configuration_service import ConfigurationService
 
 class ServiceFactory:
     """서비스 팩토리 - 서비스 인스턴스 생성 및 관리"""
@@ -76,6 +80,18 @@ class ServiceFactory:
                 self._registry.register_singleton(IChecklistService, checklist_service)
 
                 self._logger.info("Check list 관리 서비스 등록 완료")
+
+                # Phase 1.5: Category 관리 서비스 등록 (Equipment Models + Types)
+                category_service = CategoryService(self._db_schema, cache_service)
+                self._registry.register_singleton(ICategoryService, category_service)
+
+                self._logger.info("Category 관리 서비스 등록 완료")
+
+                # Phase 1.5: Configuration 관리 서비스 등록 (Equipment Configurations + Default DB Values)
+                configuration_service = ConfigurationService(self._db_schema, cache_service)
+                self._registry.register_singleton(IConfigurationService, configuration_service)
+
+                self._logger.info("Configuration 관리 서비스 등록 완료")
             else:
                 self._logger.warning("DB 스키마가 없어 서비스를 등록할 수 없습니다")
 
@@ -129,6 +145,22 @@ class ServiceFactory:
             return self._registry.get_service(IChecklistService)
         except ValueError:
             self._logger.warning("Check list 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_category_service(self) -> Optional[ICategoryService]:
+        """Category 서비스 조회 (Phase 1.5)"""
+        try:
+            return self._registry.get_service(ICategoryService)
+        except ValueError:
+            self._logger.warning("Category 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_configuration_service(self) -> Optional[IConfigurationService]:
+        """Configuration 서비스 조회 (Phase 1.5)"""
+        try:
+            return self._registry.get_service(IConfigurationService)
+        except ValueError:
+            self._logger.warning("Configuration 서비스가 등록되지 않았습니다")
             return None
 
     def get_cache_service(self) -> CacheService:
