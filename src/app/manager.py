@@ -661,6 +661,17 @@ class DBManager:
             messagebox.showerror("오류", f"Equipment Hierarchy 관리 열기 실패:\n{str(e)}")
             self.update_log(f"⚠️ Equipment Hierarchy 관리 오류: {e}")
 
+    def open_configuration_exceptions(self):
+        """Configuration Exceptions 관리 다이얼로그 열기 (Phase 1.5 Week 3 Day 4)"""
+        try:
+            # Configuration Exceptions 관리 다이얼로그 열기
+            from app.dialogs.configuration_exceptions_dialog import ConfigurationExceptionsDialog
+            ConfigurationExceptionsDialog(self.window, self.db_schema)
+
+        except Exception as e:
+            messagebox.showerror("오류", f"Configuration Exceptions 관리 열기 실패:\n{str(e)}")
+            self.update_log(f"⚠️ Configuration Exceptions 관리 오류: {e}")
+
     def show_admin_features_dialog(self):
         """관리자 기능 안내 다이얼로그"""
         dialog = tk.Toplevel(self.window)
@@ -720,6 +731,13 @@ class DBManager:
             mgmt_btn_frame,
             text="🏗️ Equipment Hierarchy 관리",
             command=self.open_equipment_hierarchy,
+            width=25
+        ).pack(pady=5)
+
+        ttk.Button(
+            mgmt_btn_frame,
+            text="⚠️ Configuration Exceptions 관리",
+            command=self.open_configuration_exceptions,
             width=25
         ).pack(pady=5)
 
