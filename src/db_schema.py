@@ -159,6 +159,50 @@ class DBSchema:
             )
             ''')
 
+            # Phase 2: 출고 장비 메타데이터 테이블
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Shipped_Equipment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_type_id INTEGER NOT NULL,
+                configuration_id INTEGER NOT NULL,
+                serial_number TEXT NOT NULL UNIQUE,
+                customer_name TEXT NOT NULL,
+                ship_date DATE,
+                is_refit INTEGER DEFAULT 0,
+                original_serial_number TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (equipment_type_id) REFERENCES Equipment_Types(id) ON DELETE RESTRICT,
+                FOREIGN KEY (configuration_id) REFERENCES Equipment_Configurations(id) ON DELETE RESTRICT
+            )
+            ''')
+
+            # Phase 2: 출고 장비 파라미터 Raw Data 테이블
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Shipped_Equipment_Parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shipped_equipment_id INTEGER NOT NULL,
+                parameter_name TEXT NOT NULL,
+                parameter_value TEXT NOT NULL,
+                module TEXT,
+                part TEXT,
+                data_type TEXT,
+                FOREIGN KEY (shipped_equipment_id) REFERENCES Shipped_Equipment(id) ON DELETE CASCADE,
+                UNIQUE (shipped_equipment_id, parameter_name)
+            )
+            ''')
+
+            # Phase 2: 인덱스 생성
+            cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_shipped_params_equipment
+            ON Shipped_Equipment_Parameters(shipped_equipment_id)
+            ''')
+
+            cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_shipped_params_name
+            ON Shipped_Equipment_Parameters(parameter_name)
+            ''')
+
             conn.commit()
     
     def add_equipment_type(self, type_name, description=""):

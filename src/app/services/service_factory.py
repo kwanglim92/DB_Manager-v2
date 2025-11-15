@@ -19,12 +19,14 @@ from .interfaces.validation_service_interface import IValidationService, IQCServ
 from .interfaces.checklist_service_interface import IChecklistService
 from .interfaces.category_service_interface import ICategoryService
 from .interfaces.configuration_service_interface import IConfigurationService
+from .interfaces.shipped_equipment_service_interface import IShippedEquipmentService
 
 # 구현체들
 from .equipment.equipment_service import EquipmentService
 from .checklist.checklist_service import ChecklistService
 from .category.category_service import CategoryService
 from .configuration.configuration_service import ConfigurationService
+from .shipped_equipment.shipped_equipment_service import ShippedEquipmentService
 
 class ServiceFactory:
     """서비스 팩토리 - 서비스 인스턴스 생성 및 관리"""
@@ -92,6 +94,12 @@ class ServiceFactory:
                 self._registry.register_singleton(IConfigurationService, configuration_service)
 
                 self._logger.info("Configuration 관리 서비스 등록 완료")
+
+                # Phase 2: Shipped Equipment 관리 서비스 등록 (출고 장비 Raw Data)
+                shipped_equipment_service = ShippedEquipmentService(self._db_schema)
+                self._registry.register_singleton(IShippedEquipmentService, shipped_equipment_service)
+
+                self._logger.info("Shipped Equipment 관리 서비스 등록 완료")
             else:
                 self._logger.warning("DB 스키마가 없어 서비스를 등록할 수 없습니다")
 
@@ -161,6 +169,14 @@ class ServiceFactory:
             return self._registry.get_service(IConfigurationService)
         except ValueError:
             self._logger.warning("Configuration 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_shipped_equipment_service(self) -> Optional[IShippedEquipmentService]:
+        """Shipped Equipment 서비스 조회 (Phase 2)"""
+        try:
+            return self._registry.get_service(IShippedEquipmentService)
+        except ValueError:
+            self._logger.warning("Shipped Equipment 서비스가 등록되지 않았습니다")
             return None
 
     def get_cache_service(self) -> CacheService:
