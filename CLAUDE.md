@@ -464,7 +464,53 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 **커밋**: feat: Phase 2 Week 4 Day 3 - Import Logic & Tests (9adf3a8)
 
-### Phase 2: Raw Data Management 🚧 **진행중** (2025-11-15 시작, 예상 2-3주)
+### Week 4 Day 4-5 완료 요약
+- **기간**: 2일 (Day 4-5)
+- **신규 파일**: 3개
+  - `src/app/dialogs/shipped_equipment_list_dialog.py` (520 lines)
+  - `src/app/dialogs/shipped_equipment_import_dialog.py` (430 lines)
+  - `src/app/dialogs/shipped_equipment_parameter_dialog.py` (280 lines)
+- **수정 파일**: 1개
+  - `src/app/manager.py` (+17 lines)
+- **코드 추가**: ~1,230+ lines
+- **테스트**: Syntax 검증 통과
+- **상태**: UI 구현 완료, Week 4 완료
+
+**주요 구현**:
+- **Shipped Equipment List Dialog** (520 lines):
+  - Treeview: Serial, Customer, Model, Type, Configuration, Ship Date, Refit
+  - 필터링: Configuration, Customer, Date Range (From/To)
+  - 검색: Serial/Customer/Model/Type/Configuration
+  - 우클릭 메뉴: View Parameters, Delete
+  - 통계 표시: Total equipment count
+
+- **Import Dialog** (430 lines):
+  - Step 1: 파일 선택 (Browse + Parse 버튼)
+  - Step 2: 자동 파싱 결과 표시
+    - Serial Number, Customer, Model, Total Parameters
+    - Auto-Matched Configuration (Model 기반)
+    - Parse Status (Success/Fail)
+  - Step 3: Configuration 선택 (Combobox)
+  - Step 4: 추가 옵션
+    - Ship Date (YYYY-MM-DD)
+    - Refit 플래그 + Original Serial Number
+    - Notes (Textarea)
+  - Import 실행 (확인 다이얼로그 포함)
+
+- **Parameter View Dialog** (280 lines):
+  - 장비 정보 표시: Serial, Customer, Model, Configuration, Ship Date, Refit
+  - Treeview: Parameter Name, Value, Module, Part, Data Type
+  - 검색: Parameter Name/Value/Module/Part
+  - Export CSV: 필터링된 파라미터를 CSV로 내보내기
+  - 통계 표시: Total parameters (filtered / total)
+
+- **manager.py 통합**:
+  - show_admin_features_dialog(): "📦 Shipped Equipment 관리" 버튼 추가
+  - open_shipped_equipment_list() 메서드 추가
+
+**커밋**: feat: Phase 2 Week 4 Day 4-5 - Shipped Equipment UI (bc55eb6)
+
+### Phase 2: Raw Data Management ✅ **Week 4 완료** (2025-11-15 시작, 3일 소요)
 **예상 작업량**:
 - 신규 테이블: 2개 (Shipped_Equipment, Shipped_Equipment_Parameters)
 - 신규 서비스: 1개 (ShippedEquipmentService)
