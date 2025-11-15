@@ -358,19 +358,20 @@ class SimplifiedQCSystem:
         if critical_issues:
             recommendations.append("⭐ 중요 파라미터의 발생 빈도를 점검하세요.")
 
-        # Phase 1: Check list 검증 결과 기반 권장사항
+        # Phase 1.5: Check list 검증 결과 기반 권장사항 (심각도 제거, Pass/Fail만)
         if checklist_validation:
             if not checklist_validation.get('qc_passed', True):
                 reason = checklist_validation.get('qc_reason', '')
+                failed_count = checklist_validation.get('failed', 0)
                 recommendations.append(f"❌ Check list 검증 실패: {reason}")
 
-            critical_failures = checklist_validation.get('critical_failures', [])
-            if critical_failures:
-                recommendations.append(f"🚨 CRITICAL 레벨 {len(critical_failures)}개 항목 실패 - 즉시 조치 필요")
+                if failed_count > 0:
+                    recommendations.append(f"⚠️ {failed_count}개 항목 실패 - 즉시 조치 필요")
 
-            high_failures = checklist_validation.get('high_failures', [])
-            if high_failures and len(high_failures) < 3:
-                recommendations.append(f"⚠️ HIGH 레벨 {len(high_failures)}개 항목 실패 - 검토 권장")
+            # 예외 적용 정보 표시
+            exception_count = checklist_validation.get('exception_count', 0)
+            if exception_count > 0:
+                recommendations.append(f"ℹ️ {exception_count}개 항목이 예외로 처리되었습니다.")
 
         if mode == "checklist_only" and not results:
             recommendations.append("✅ 모든 중요 파라미터가 정상 상태입니다.")
