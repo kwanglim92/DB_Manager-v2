@@ -369,7 +369,57 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
-### Phase 2: Raw Data Management (계획)
+### Week 4 Day 1-2 완료 요약
+- **기간**: 2일 (Day 1-2)
+- **신규 파일**: 4개
+  - `src/app/services/interfaces/shipped_equipment_service_interface.py` (360 lines)
+  - `src/app/services/shipped_equipment/shipped_equipment_service.py` (655 lines)
+  - `src/app/services/shipped_equipment/__init__.py` (5 lines)
+  - `tools/test_week4_day1_2.py` (330 lines)
+- **수정 파일**: 2개
+  - `src/db_schema.py` (+44 lines)
+  - `src/app/services/service_factory.py` (+13 lines)
+- **코드 추가**: ~1,300+ lines
+- **테스트**: Database schema 검증 완료 (1/1, 100%)
+- **상태**: Database & Service 구축 완료, Import Logic 대기중
+
+**주요 구현**:
+- **Database Schema** (db_schema.py):
+  - Shipped_Equipment 테이블 (출고 장비 메타데이터)
+    - 10개 필드: id, equipment_type_id, configuration_id, serial_number, customer_name, ship_date, is_refit, original_serial_number, notes, created_at
+    - FK 제약: equipment_type_id, configuration_id (RESTRICT)
+    - UNIQUE 제약: serial_number
+  - Shipped_Equipment_Parameters 테이블 (출고 장비 Raw Data, 2000+ 파라미터)
+    - 7개 필드: id, shipped_equipment_id, parameter_name, parameter_value, module, part, data_type
+    - FK 제약: shipped_equipment_id (CASCADE DELETE)
+    - UNIQUE 제약: (shipped_equipment_id, parameter_name)
+  - 인덱스 2개: idx_shipped_params_equipment, idx_shipped_params_name
+
+- **ShippedEquipmentService 인터페이스** (360 lines):
+  - 데이터 클래스 4개: ShippedEquipment, ShippedEquipmentParameter, FileParseResult, ParameterHistory
+  - 메서드 13개: CRUD, File Import, Parameter Management, Statistics
+
+- **ShippedEquipmentService 구현** (655 lines):
+  - Shipped Equipment CRUD (create, read, update, delete)
+  - Batch Insert (1000 rows at a time) for 2000+ parameters
+  - File Parsing: `{Serial}_{Customer}_{Model}.txt` 형식
+  - Auto-Matching: Model → Type → Configuration 자동 매칭
+  - Parameter History & Statistics (min/max/avg/std_dev)
+  - Data Type Inference (int, float, bool, str)
+
+- **ServiceFactory 통합**:
+  - IShippedEquipmentService 등록
+  - get_shipped_equipment_service() getter 메서드
+
+**테스트 결과**:
+- Test 1: Database tables creation - PASS
+  - Shipped_Equipment 테이블 생성 확인
+  - Shipped_Equipment_Parameters 테이블 생성 확인
+  - 인덱스 생성 확인
+
+**커밋**: feat: Phase 2 Week 4 Day 1-2 - Database & Service (857f626)
+
+### Phase 2: Raw Data Management 🚧 **진행중** (2025-11-15 시작, 예상 2-3주)
 **예상 작업량**:
 - 신규 테이블: 2개 (Shipped_Equipment, Shipped_Equipment_Parameters)
 - 신규 서비스: 1개 (ShippedEquipmentService)
