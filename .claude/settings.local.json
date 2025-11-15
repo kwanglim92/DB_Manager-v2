@@ -1,33 +1,9 @@
 {
   "permissions": {
     "allow": [
-      "Bash(del /s /q *.pyc 2)",
-      "Bash(/tmp/phase1_manager_diff.txt)",
-      "Bash(tree:*)",
-      "Bash(dir:*)",
-      "Bash(xargs ls:*)",
-      "Bash(test:*)",
-      "Bash(sqlite3:*)",
+      "Bash(python -m py_compile:*)",
       "Bash(git add:*)",
-      "Bash(git commit:*)",
-      "Bash(git tag:*)",
-      "Bash(\"src/app/dialogs/__init__.py\")",
-      "Bash(if exist \"src\\main_optimized.py\" del \"src\\main_optimized.py\")",
-      "Bash(if exist \"src\\app\\core\" rmdir /s /q \"src\\app\\core\")",
-      "Bash(if exist \"src\\app\\ui\" rmdir /s /q \"src\\app\\ui\")",
-      "Bash(if exist \"docs\\SYSTEM_COMPARISON.md\" del \"docs\\SYSTEM_COMPARISON.md\")",
-      "Bash(python tools/test_phase1.py:*)",
-      "Bash(python3:*)",
-      "Bash(python src/main.py:*)",
-      "Bash(taskkill:*)",
-      "Bash(find:*)",
-      "Bash(git push)",
-      "Bash(python:*)",
-      "Bash(git log:*)",
-      "Bash(iconv:*)",
-      "Bash(cat:*)",
-      "Bash(findstr:*)",
-      "Bash(ls \"c:\\Users\\Levi Beak\\Desktop\\DB_Manager-v2\\test\"\" 2>/dev/null || echo \"test folder not found \")"
+      "Bash(git commit:*)"
     ],
     "deny": [],
     "ask": []

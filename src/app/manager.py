@@ -661,6 +661,22 @@ class DBManager:
             messagebox.showerror("오류", f"Equipment Hierarchy 관리 열기 실패:\n{str(e)}")
             self.update_log(f"⚠️ Equipment Hierarchy 관리 오류: {e}")
 
+    def open_shipped_equipment_list(self):
+        """Shipped Equipment 목록 다이얼로그 열기 (Phase 2)"""
+        try:
+            # 서비스 팩토리 초기화 확인
+            if not hasattr(self, 'service_factory') or self.service_factory is None:
+                from app.services import ServiceFactory
+                self.service_factory = ServiceFactory(self.db_schema)
+
+            # Shipped Equipment List 다이얼로그 열기
+            from app.dialogs.shipped_equipment_list_dialog import ShippedEquipmentListDialog
+            ShippedEquipmentListDialog(self.window, self.db_schema, self.service_factory)
+
+        except Exception as e:
+            messagebox.showerror("오류", f"Shipped Equipment 목록 열기 실패:\n{str(e)}")
+            self.update_log(f"⚠️ Shipped Equipment 목록 오류: {e}")
+
     def open_configuration_exceptions(self):
         """Configuration Exceptions 관리 다이얼로그 열기 (Phase 1.5 Week 3 Day 4)"""
         try:
@@ -738,6 +754,13 @@ class DBManager:
             mgmt_btn_frame,
             text="⚠️ Configuration Exceptions 관리",
             command=self.open_configuration_exceptions,
+            width=25
+        ).pack(pady=5)
+
+        ttk.Button(
+            mgmt_btn_frame,
+            text="📦 Shipped Equipment 관리",
+            command=self.open_shipped_equipment_list,
             width=25
         ).pack(pady=5)
 
