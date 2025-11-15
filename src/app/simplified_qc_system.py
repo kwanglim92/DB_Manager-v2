@@ -19,6 +19,14 @@ except ImportError:
     CHECKLIST_VALIDATOR_AVAILABLE = False
     print("[WARN] ChecklistValidator를 불러올 수 없습니다. Check list 검증이 비활성화됩니다.")
 
+# Phase 1.5: qc_inspection_v2 통합
+try:
+    from app.qc.qc_inspection_v2 import qc_inspection_v2, get_inspection_summary
+    QC_INSPECTION_V2_AVAILABLE = True
+except ImportError:
+    QC_INSPECTION_V2_AVAILABLE = False
+    print("[WARN] qc_inspection_v2를 불러올 수 없습니다. v2 검증이 비활성화됩니다.")
+
 class SimplifiedQCSystem:
     """간소화된 QC 검수 시스템"""
 
@@ -31,14 +39,15 @@ class SimplifiedQCSystem:
         """기본 로그 출력"""
         print(f"[QC] {message}")
     
-    def perform_qc_check(self, equipment_type_id: int, mode: str = "comprehensive") -> Dict[str, Any]:
+    def perform_qc_check(self, equipment_type_id: int, mode: str = "comprehensive", configuration_id: Optional[int] = None) -> Dict[str, Any]:
         """
         간소화된 QC 검수 실행
-        
+
         Args:
             equipment_type_id: 장비 유형 ID
             mode: 검수 모드 ("comprehensive", "checklist_only")
-            
+            configuration_id: Configuration ID (Optional, Phase 1.5)
+
         Returns:
             검수 결과 딕셔너리
         """
@@ -66,11 +75,11 @@ class SimplifiedQCSystem:
             # 3. 간소화된 QC 검수 실행
             qc_results = self._run_basic_qc_checks(df, mode)
 
-            # 4. Phase 1: Check list 기반 검증 통합
+            # 4. Phase 1.5: Check list 기반 검증 통합 (qc_inspection_v2 사용)
             checklist_validation = None
             if CHECKLIST_VALIDATOR_AVAILABLE and self.service_factory:
                 try:
-                    checklist_validation = self._run_checklist_validation(df, equipment_type_id)
+                    checklist_validation = self._run_checklist_validation(df, equipment_type_id, configuration_id)
                     self.update_log(f"✅ Check list 검증 완료 - {checklist_validation['checklist_params']}개 항목 검증")
                 except Exception as e:
                     self.update_log(f"⚠️ Check list 검증 중 오류: {str(e)}")
@@ -203,17 +212,52 @@ class SimplifiedQCSystem:
 
         return issues
 
-    def _run_checklist_validation(self, df: pd.DataFrame, equipment_type_id: int) -> Dict:
+    def _run_checklist_validation(self, df: pd.DataFrame, equipment_type_id: int, configuration_id: Optional[int] = None) -> Dict:
         """
-        Phase 1: Check list 기반 파라미터 검증 실행
+        Phase 1.5: qc_inspection_v2 기반 파라미터 검증 실행
 
         Args:
             df: 검증할 데이터프레임
             equipment_type_id: 장비 유형 ID
+            configuration_id: Configuration ID (Optional)
 
         Returns:
             Check list 검증 결과
         """
+        # Phase 1.5: qc_inspection_v2 사용
+        if QC_INSPECTION_V2_AVAILABLE:
+            try:
+                # 데이터프레임을 file_data 형식으로 변환 (ItemName: Value 매핑)
+                file_data = {}
+                for _, row in df.iterrows():
+                    item_name = row['parameter_name']
+                    value = row['default_value']
+                    file_data[item_name] = value
+
+                # qc_inspection_v2() 실행
+                result = qc_inspection_v2(file_data, configuration_id)
+
+                # 기존 형식에 맞게 변환
+                validation_result = {
+                    'checklist_params': result['total_count'],
+                    'passed': result['total_count'] - result['failed_count'],
+                    'failed': result['failed_count'],
+                    'qc_passed': result['is_pass'],
+                    'qc_reason': 'Pass' if result['is_pass'] else f"{result['failed_count']}개 항목 실패",
+                    'results': result['results'],
+                    'matched_count': result.get('matched_count', 0),
+                    'exception_count': result.get('exception_count', 0)
+                }
+
+                self.update_log(f"✅ qc_inspection_v2 검증 완료 - {result['total_count']}개 항목 검증")
+                return validation_result
+
+            except Exception as e:
+                self.update_log(f"❌ qc_inspection_v2 검증 중 오류: {str(e)}")
+                import traceback
+                traceback.print_exc()
+
+        # Fallback: Phase 1 ChecklistValidator 사용
         if not self.service_factory:
             return None
 
