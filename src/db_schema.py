@@ -66,15 +66,52 @@ class DBSchema:
         """
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
-            # 장비 유형 테이블
+
+            # Phase 1.5: 장비 모델 테이블 (최상위 계층)
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Equipment_Models (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                display_order INTEGER DEFAULT 999,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+
+            # Phase 1.5: 장비 유형 테이블 (Equipment_Models의 하위 계층)
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS Equipment_Types (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_name TEXT NOT NULL UNIQUE,
+                model_id INTEGER,
+                type_name TEXT NOT NULL,
+                description TEXT,
+                display_order INTEGER DEFAULT 999,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (model_id) REFERENCES Equipment_Models(id) ON DELETE CASCADE,
+                UNIQUE (model_id, type_name)
+            )
+            ''')
+
+            # Phase 1.5: 장비 구성 테이블 (Equipment_Types의 하위 계층)
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Equipment_Configurations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id INTEGER NOT NULL,
+                configuration_name TEXT NOT NULL,
+                port_type TEXT,
+                port_count INTEGER,
+                wafer_size TEXT,
+                wafer_count INTEGER,
+                custom_options TEXT,
+                is_customer_specific INTEGER DEFAULT 0,
+                customer_name TEXT,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (type_id) REFERENCES Equipment_Types(id) ON DELETE CASCADE,
+                UNIQUE (type_id, configuration_name)
             )
             ''')
             

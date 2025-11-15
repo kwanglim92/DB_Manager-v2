@@ -308,8 +308,11 @@ class ShippedEquipmentService(IShippedEquipmentService):
         """
         장비 데이터 파일 파싱 ({Serial}_{Customer}_{Model}.txt)
 
-        파일명 형식: U27005-100225_Intel_NX-Hybrid.txt
+        파일명 형식: U27005-100225_Intel Hillsboro #4_NX-Hybrid WLI.txt
                     D27004-211124_Samsung_NX-Mask.txt
+
+        파일 형식: TSV (Tab-separated values)
+                  헤더: Module\tPart\tItemName\tItemType\tItemValue\tItemDescription
         """
         try:
             # 1. 파일명 파싱
@@ -335,31 +338,60 @@ class ShippedEquipmentService(IShippedEquipmentService):
             parameters = []
 
             with open(file_path, 'r', encoding='utf-8') as f:
+                # 첫 줄(헤더) 읽기
+                header_line = f.readline().strip()
+
+                # TSV 형식 확인 (탭으로 구분된 헤더)
+                is_tsv = '\t' in header_line
+
                 for line in f:
                     line = line.strip()
                     if not line or line.startswith('#'):
                         continue
 
-                    # ItemName=Value 형식 또는 Module.Part.ItemName=Value
-                    if '=' not in line:
-                        continue
+                    if is_tsv:
+                        # TSV 형식: Module\tPart\tItemName\tItemType\tItemValue\tItemDescription
+                        columns = line.split('\t')
 
-                    key, value = line.split('=', 1)
-                    key_parts = key.split('.')
+                        if len(columns) < 5:
+                            continue  # 필수 컬럼 부족
 
-                    param = {
-                        'parameter_name': key,
-                        'parameter_value': value,
-                        'module': None,
-                        'part': None,
-                        'data_type': self._infer_data_type(value)
-                    }
+                        module = columns[0]
+                        part = columns[1]
+                        item_name = columns[2]
+                        item_type = columns[3]
+                        item_value = columns[4]
 
-                    # Module.Part.ItemName 구조 파싱
-                    if len(key_parts) >= 3:
-                        param['module'] = key_parts[0]
-                        param['part'] = key_parts[1]
-                        # parameter_name은 전체 유지
+                        # Module.Part.ItemName 형식으로 parameter_name 생성
+                        parameter_name = f"{module}.{part}.{item_name}"
+
+                        param = {
+                            'parameter_name': parameter_name,
+                            'parameter_value': item_value,
+                            'module': module,
+                            'part': part,
+                            'data_type': item_type if item_type else self._infer_data_type(item_value)
+                        }
+                    else:
+                        # 기존 Key=Value 형식
+                        if '=' not in line:
+                            continue
+
+                        key, value = line.split('=', 1)
+                        key_parts = key.split('.')
+
+                        param = {
+                            'parameter_name': key,
+                            'parameter_value': value,
+                            'module': None,
+                            'part': None,
+                            'data_type': self._infer_data_type(value)
+                        }
+
+                        # Module.Part.ItemName 구조 파싱
+                        if len(key_parts) >= 3:
+                            param['module'] = key_parts[0]
+                            param['part'] = key_parts[1]
 
                     parameters.append(param)
 

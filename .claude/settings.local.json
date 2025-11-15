@@ -20,7 +20,14 @@
       "Bash(python3:*)",
       "Bash(python src/main.py:*)",
       "Bash(taskkill:*)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(git push)",
+      "Bash(python:*)",
+      "Bash(git log:*)",
+      "Bash(iconv:*)",
+      "Bash(cat:*)",
+      "Bash(findstr:*)",
+      "Bash(ls \"c:\\Users\\Levi Beak\\Desktop\\DB_Manager-v2\\test\"\" 2>/dev/null || echo \"test folder not found \")"
     ],
     "deny": [],
     "ask": []

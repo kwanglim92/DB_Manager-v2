@@ -13,8 +13,8 @@ from ..interfaces.configuration_service_interface import (
     EquipmentConfiguration,
     DefaultDBValue
 )
-from ..cache_service import CacheService
-from ..logging_service import LoggingService
+from ..common.cache_service import CacheService
+from ..common.logging_service import LoggingService
 
 
 class ConfigurationService(IConfigurationService):
