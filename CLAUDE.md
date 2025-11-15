@@ -258,6 +258,24 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
     - Expected Value 검증 (Enum, 문자열)
     - 활성화된 항목만 검증
   - 테스트 통과: 5/5 (100%)
+- ✅ **Week 3 Day 4 완료** (Configuration Exceptions Dialog):
+  - 파일: `src/app/dialogs/configuration_exceptions_dialog.py` (신규, 565 lines)
+  - 파일: `src/app/manager.py` (open_configuration_exceptions 메서드 추가)
+  - ✅ Configuration Exceptions Dialog 구현
+    - Model → Type → Configuration 3단계 선택
+    - 적용된 예외 목록 Treeview
+    - 예외 추가/제거 기능
+  - ✅ CRUD 기능 완료
+    - Add: AddExceptionDialog (Checklist 항목 선택 + 사유 필수)
+    - Remove: Audit Log 기록
+    - 중복 예외 방지 (이미 추가된 항목 필터링)
+  - ✅ 승인 시스템
+    - 승인자 입력 (기본값: Admin)
+    - 승인일 자동 기록 (현재 시각)
+  - ✅ manager.py 통합
+    - open_configuration_exceptions() 메서드 추가
+    - show_admin_features_dialog() 버튼 추가 ("⚠️ Configuration Exceptions 관리")
+  - 테스트: Syntax 및 Import 검증 완료
 
 ### Week 2 완료 요약
 - **기간**: 5일 (Day 1-5)
@@ -283,6 +301,19 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 **주요 구현**:
 - QC Checklist Management Dialog (CRUD + Active/Inactive + Import CSV)
 - ChecklistItemDialog (Add/Edit 모드)
+- manager.py 통합 (관리자 모드에서 접근 가능)
+
+### Week 3 Day 4 완료 요약
+- **기간**: 1일 (Day 4)
+- **신규 파일**: 1개 (configuration_exceptions_dialog.py)
+- **수정 파일**: 1개 (manager.py)
+- **코드 추가**: ~565+ lines
+- **테스트**: Syntax 및 Import 검증 완료
+- **상태**: Configuration Exceptions Dialog 완료, manager.py 통합 완료
+
+**주요 구현**:
+- Configuration Exceptions Dialog (3단계 선택 + 예외 관리)
+- AddExceptionDialog (사유 필수 + 승인 시스템)
 - manager.py 통합 (관리자 모드에서 접근 가능)
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
