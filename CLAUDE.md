@@ -276,6 +276,25 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
     - open_configuration_exceptions() 메서드 추가
     - show_admin_features_dialog() 버튼 추가 ("⚠️ Configuration Exceptions 관리")
   - 테스트: Syntax 및 Import 검증 완료
+- ✅ **Week 3 Day 5 완료** (QC Inspection Integration):
+  - 파일: `src/app/simplified_qc_system.py` (수정, +51 lines)
+  - 파일: `src/app/qc_reports.py` (수정, +147 lines)
+  - 파일: `tools/test_week3_day5.py` (신규, 235 lines)
+  - ✅ SimplifiedQCSystem qc_inspection_v2 통합
+    - qc_inspection_v2 import 및 fallback 패턴 구현
+    - perform_qc_check() configuration_id 파라미터 추가
+    - _run_checklist_validation() qc_inspection_v2 사용
+    - DataFrame ↔ file_data 변환 로직
+    - 결과 형식 변환 (qc_inspection_v2 → 레거시)
+  - ✅ Result 표시 간소화 (Pass/Fail)
+    - Check list 검증 권장사항에서 심각도 제거
+    - critical_failures, high_failures → failed_count
+    - 예외 적용 정보 추가 (exception_count)
+  - ✅ Report 생성 업데이트
+    - export_full_qc_report_to_excel() 함수 신규 추가
+    - 4개 시트: 검수 요약, 기본 QC 검사, Check list 검증, 권장사항
+    - Check list 검증: Pass/Fail만, 심각도 없음
+  - 테스트: End-to-End 테스트 통과 (6/6, 100%)
 
 ### Week 2 완료 요약
 - **기간**: 5일 (Day 1-5)
@@ -315,6 +334,38 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 - Configuration Exceptions Dialog (3단계 선택 + 예외 관리)
 - AddExceptionDialog (사유 필수 + 승인 시스템)
 - manager.py 통합 (관리자 모드에서 접근 가능)
+
+### Week 3 Day 5 완료 요약
+- **기간**: 1일 (Day 5)
+- **수정 파일**: 2개 (simplified_qc_system.py, qc_reports.py)
+- **신규 파일**: 1개 (test_week3_day5.py)
+- **코드 추가/수정**: ~200+ lines
+- **테스트**: End-to-End 테스트 통과 (6/6, 100%)
+- **상태**: QC Inspection Integration 완료
+
+**주요 구현**:
+- SimplifiedQCSystem qc_inspection_v2 통합:
+  - qc_inspection_v2 import 및 fallback 패턴
+  - perform_qc_check() configuration_id 파라미터 추가
+  - _run_checklist_validation() qc_inspection_v2 사용
+  - DataFrame ↔ file_data 변환
+  - 결과 형식 변환 (v2 → 레거시)
+- Result 표시 간소화:
+  - Check list 검증 권장사항에서 심각도 제거
+  - critical_failures, high_failures → failed_count
+  - 예외 적용 정보 추가
+- Report 생성 업데이트:
+  - export_full_qc_report_to_excel() 함수 추가
+  - 4개 시트: 검수 요약, 기본 QC 검사, Check list 검증, 권장사항
+  - Check list 검증: Pass/Fail만, 심각도 없음
+
+**테스트 결과**:
+- Test 1: qc_inspection_v2 import - PASS
+- Test 2: SimplifiedQCSystem import - PASS
+- Test 3: perform_qc_check() signature - PASS
+- Test 4: _run_checklist_validation() signature - PASS
+- Test 5: export_full_qc_report_to_excel() import - PASS
+- Test 6: Result format compatibility - PASS
 
 **참조 문서**: `docs/PHASE1.5-2_IMPLEMENTATION_PLAN.md`
 
