@@ -20,7 +20,9 @@ class UnifiedQCSystem:
     
     def _default_log(self, message: str):
         """기본 로그 출력"""
-        print(f"[QC] {message}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[QC] {message}")
     
     def perform_unified_qc_check(self, equipment_type_id: int, mode: str = "comprehensive") -> Dict[str, Any]:
         """

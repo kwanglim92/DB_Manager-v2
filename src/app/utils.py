@@ -366,8 +366,17 @@ def log_message(message, level="INFO"):
     """
     로그 메시지를 출력합니다.
     """
-    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-    print(f"[{timestamp}] {level}: {message}")
+    import logging
+    logger = logging.getLogger(__name__)
+    level_map = {
+        "DEBUG": logger.debug,
+        "INFO": logger.info,
+        "WARNING": logger.warning,
+        "ERROR": logger.error,
+        "CRITICAL": logger.critical
+    }
+    log_func = level_map.get(level.upper(), logger.info)
+    log_func(message)
 
 def show_info(title, message):
     """정보 메시지박스를 표시합니다."""

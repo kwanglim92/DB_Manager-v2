@@ -310,7 +310,9 @@ class EnhancedDefaultDBTransfer:
     
     def _default_log(self, message: str):
         """기본 로그 출력"""
-        print(f"[Transfer] {message}")
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.info(f"[Transfer] {message}")
     
     def enhanced_transfer_to_default_db(self, selected_items: List, equipment_type_id: int,
                                       manager_instance) -> Dict[str, Any]:

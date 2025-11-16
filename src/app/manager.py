@@ -2491,116 +2491,138 @@ class DBManager:
         self.update_checked_count()
 
     def update_comparison_view(self, search_filter=""):
+        """비교 뷰 업데이트"""
+        # 트리뷰 초기화
+        saved_checkboxes = self._initialize_comparison_tree()
+
+        # 데이터 처리
+        diff_count, total_items, filtered_items = self._process_comparison_items(search_filter, saved_checkboxes)
+
+        # 상태 업데이트
+        self._update_comparison_status(diff_count, total_items, filtered_items, search_filter)
+
+    def _initialize_comparison_tree(self):
+        """비교 트리뷰 초기화 - 체크박스 상태 저장 및 반환"""
         for item in self.comparison_tree.get_children():
             self.comparison_tree.delete(item)
-        
+
         saved_checkboxes = self.item_checkboxes.copy()
         self.item_checkboxes.clear()
-        
+
         if self.maint_mode:
             self.comparison_tree.bind("<ButtonRelease-1>", self.toggle_checkbox)
         else:
             self.comparison_tree.unbind("<ButtonRelease-1>")
-        
+
+        return saved_checkboxes
+
+    def _process_comparison_items(self, search_filter, saved_checkboxes):
+        """비교 항목 처리 및 트리에 삽입 - 통계 반환"""
         diff_count = 0
         total_items = 0
         filtered_items = 0
-        
-        if self.merged_df is not None:
-            # 파라미터별로 그룹화하여 비교
-            grouped = self.merged_df.groupby(["Module", "Part", "ItemName"])
-            
-            for (module, part, item_name), group in grouped:
-                total_items += 1
-                
-                # 검색 필터링 적용
-                if search_filter and search_filter not in item_name.lower():
+
+        if self.merged_df is None:
+            return diff_count, total_items, filtered_items
+
+        # 파라미터별로 그룹화하여 비교
+        grouped = self.merged_df.groupby(["Module", "Part", "ItemName"])
+
+        for (module, part, item_name), group in grouped:
+            total_items += 1
+
+            # 검색 필터링 적용
+            if search_filter and search_filter not in item_name.lower():
+                continue
+
+            # Module 필터링 적용
+            if hasattr(self, 'comparison_module_filter_var'):
+                module_filter = self.comparison_module_filter_var.get()
+                if module_filter and module_filter != "All" and module != module_filter:
                     continue
-                
-                # Module 필터링 적용
-                if hasattr(self, 'comparison_module_filter_var'):
-                    module_filter = self.comparison_module_filter_var.get()
-                    if module_filter and module_filter != "All" and module != module_filter:
-                        continue
-                
-                # Part 필터링 적용
-                if hasattr(self, 'comparison_part_filter_var'):
-                    part_filter = self.comparison_part_filter_var.get()
-                    if part_filter and part_filter != "All" and part != part_filter:
-                        continue
-                
-                filtered_items += 1
-                
-                values = []
-                
-                if self.maint_mode:
-                    checkbox_state = "☐"
-                    item_key = f"{module}_{part}_{item_name}"
-                    if item_key in saved_checkboxes and saved_checkboxes[item_key]:
-                        checkbox_state = "☑"
-                    self.item_checkboxes[item_key] = (checkbox_state == "☑")
-                    values.append(checkbox_state)
-                
-                values.extend([module, part, item_name])
-                
-                # 각 파일별 값 추출 및 비교
-                file_values = []
-                for model in self.file_names:
-                    model_data = group[group["Model"] == model]
-                    if not model_data.empty:
-                        value = model_data["ItemValue"].iloc[0]
-                        file_values.append(str(value))
-                    else:
-                        file_values.append("-")
-                
-                values.extend(file_values)
-                
-                # 차이점 검사 - 모든 값이 동일한지 확인
-                unique_values = set(v for v in file_values if v != "-")
-                has_difference = len(unique_values) > 1
-                
-                tags = []
-                if has_difference:
-                    tags.append("different")
-                    diff_count += 1
-                
-                # Default DB에 존재하는지 확인
-                is_existing = self.check_if_parameter_exists(module, part, item_name)
-                if is_existing:
-                    tags.append("existing")
-                
-                self.comparison_tree.insert("", "end", values=values, tags=tuple(tags))
-            
-            # 스타일 설정
-            self.comparison_tree.tag_configure("different", background="#FFECB3", foreground="#E65100")
-            self.comparison_tree.tag_configure("existing", foreground="#1976D2")
-            
+
+            # Part 필터링 적용
+            if hasattr(self, 'comparison_part_filter_var'):
+                part_filter = self.comparison_part_filter_var.get()
+                if part_filter and part_filter != "All" and part != part_filter:
+                    continue
+
+            filtered_items += 1
+
+            values = []
+
             if self.maint_mode:
-                self.comparison_tree.bind("<ButtonRelease-1>", self.toggle_checkbox)
-            
-            self.update_selected_count(None)
-        
+                checkbox_state = "☐"
+                item_key = f"{module}_{part}_{item_name}"
+                if item_key in saved_checkboxes and saved_checkboxes[item_key]:
+                    checkbox_state = "☑"
+                self.item_checkboxes[item_key] = (checkbox_state == "☑")
+                values.append(checkbox_state)
+
+            values.extend([module, part, item_name])
+
+            # 각 파일별 값 추출 및 비교
+            file_values = []
+            for model in self.file_names:
+                model_data = group[group["Model"] == model]
+                if not model_data.empty:
+                    value = model_data["ItemValue"].iloc[0]
+                    file_values.append(str(value))
+                else:
+                    file_values.append("-")
+
+            values.extend(file_values)
+
+            # 차이점 검사 - 모든 값이 동일한지 확인
+            unique_values = set(v for v in file_values if v != "-")
+            has_difference = len(unique_values) > 1
+
+            tags = []
+            if has_difference:
+                tags.append("different")
+                diff_count += 1
+
+            # Default DB에 존재하는지 확인
+            is_existing = self.check_if_parameter_exists(module, part, item_name)
+            if is_existing:
+                tags.append("existing")
+
+            self.comparison_tree.insert("", "end", values=values, tags=tuple(tags))
+
+        # 스타일 설정
+        self.comparison_tree.tag_configure("different", background="#FFECB3", foreground="#E65100")
+        self.comparison_tree.tag_configure("existing", foreground="#1976D2")
+
+        if self.maint_mode:
+            self.comparison_tree.bind("<ButtonRelease-1>", self.toggle_checkbox)
+
+        self.update_selected_count(None)
+
+        return diff_count, total_items, filtered_items
+
+    def _update_comparison_status(self, diff_count, total_items, filtered_items, search_filter):
+        """비교 뷰 상태 레이블 업데이트"""
         # 차이점 카운트 업데이트
         if not self.maint_mode and hasattr(self, 'diff_count_label'):
             self.diff_count_label.config(text=f"값이 다른 항목: {diff_count}개")
-        
+
         # 검색 결과 표시 업데이트
         if hasattr(self, 'search_result_label'):
             if search_filter:
                 self.search_result_label.config(text=f"검색 결과: {filtered_items}개 (전체: {total_items}개)")
             else:
                 self.search_result_label.config(text="")
-        
+
         # 필터 옵션 업데이트
         if hasattr(self, '_update_comparison_filter_options'):
             self._update_comparison_filter_options()
-        
+
         # 필터 결과 표시 업데이트
         if hasattr(self, 'comparison_filter_result_label'):
             # Module/Part 필터가 적용된 경우 결과 표시
             module_filter = getattr(self, 'comparison_module_filter_var', tk.StringVar()).get()
             part_filter = getattr(self, 'comparison_part_filter_var', tk.StringVar()).get()
-            
+
             if (module_filter and module_filter != "All") or (part_filter and part_filter != "All"):
                 self.comparison_filter_result_label.config(text=f"필터 결과: {filtered_items}/{total_items} 항목")
             else:
@@ -2766,38 +2788,17 @@ class DBManager:
     def create_qc_check_tab(self):
         """QC 검수 탭 생성 - 새로운 QCTabController 사용"""
         try:
-            # 기존 탭 중복 검사 강화
-            if hasattr(self, 'main_notebook') and self.main_notebook:
-                for tab_id in range(self.main_notebook.index('end')):
-                    try:
-                        tab_text = self.main_notebook.tab(tab_id, 'text')
-                        if "QC 검수" in tab_text or "검수" in tab_text:
-                            self.update_log(f"⚠️ QC 검수 탭이 이미 존재함 ({tab_text}) - 기존 탭으로 이동")
-                            self.main_notebook.select(tab_id)
-                            return
-                    except tk.TclError:
-                        continue
-            
+            # 기존 탭 중복 검사
+            if self._check_qc_tab_duplicate():
+                return
+
             # 프레임 참조 체크
             if self.qc_check_frame is not None:
                 self.update_log("⚠️ QC 프레임 참조가 남아있음 - 초기화 후 재생성")
                 self.qc_check_frame = None
-            
-            self.update_log("🚀 새로운 QC 탭 컨트롤러로 탭 생성 시작...")
-            
-            # 🚀 새로운 QCTabController 사용
-            from app.ui.controllers.tab_controllers.qc_tab_controller import QCTabController
-            
-            # QC 검수 탭 프레임 생성
-            self.qc_check_frame = ttk.Frame(self.main_notebook)
-            self.main_notebook.add(self.qc_check_frame, text="🔍 QC 검수 (신규)")
-            
-            # QCTabController 인스턴스 생성
-            self.qc_tab_controller = QCTabController(self.qc_check_frame, self)
-            
-            self.update_log("🎉 새로운 QC 탭 컨트롤러로 탭이 생성되었습니다!")
-            self.update_log("   ✅ 리팩토링된 UI 적용됨")
-            self.update_log("   ✅ 최종 보고서 기능 포함됨")
+
+            # QCTabController를 사용하여 탭 생성
+            self._create_qc_tab_with_controller()
             return  # 여기서 메서드 종료 (기존 코드 실행 방지)
             
             # 🆕 src/app/qc.py의 완전한 QC 탭 기능 사용
@@ -2883,6 +2884,38 @@ class DBManager:
             traceback.print_exc()
             # 실패 시 프레임 참조 정리
             self.qc_check_frame = None
+
+    def _check_qc_tab_duplicate(self):
+        """QC 탭 중복 검사 - 중복 시 True 반환"""
+        if hasattr(self, 'main_notebook') and self.main_notebook:
+            for tab_id in range(self.main_notebook.index('end')):
+                try:
+                    tab_text = self.main_notebook.tab(tab_id, 'text')
+                    if "QC 검수" in tab_text or "검수" in tab_text:
+                        self.update_log(f"⚠️ QC 검수 탭이 이미 존재함 ({tab_text}) - 기존 탭으로 이동")
+                        self.main_notebook.select(tab_id)
+                        return True
+                except tk.TclError:
+                    continue
+        return False
+
+    def _create_qc_tab_with_controller(self):
+        """QCTabController를 사용하여 QC 탭 생성"""
+        self.update_log("🚀 새로운 QC 탭 컨트롤러로 탭 생성 시작...")
+
+        # QCTabController import
+        from app.ui.controllers.tab_controllers.qc_tab_controller import QCTabController
+
+        # QC 검수 탭 프레임 생성
+        self.qc_check_frame = ttk.Frame(self.main_notebook)
+        self.main_notebook.add(self.qc_check_frame, text="🔍 QC 검수 (신규)")
+
+        # QCTabController 인스턴스 생성
+        self.qc_tab_controller = QCTabController(self.qc_check_frame, self)
+
+        self.update_log("🎉 새로운 QC 탭 컨트롤러로 탭이 생성되었습니다!")
+        self.update_log("   ✅ 리팩토링된 UI 적용됨")
+        self.update_log("   ✅ 최종 보고서 기능 포함됨")
 
     def _initialize_default_db_tab_frame(self):
         """
@@ -3622,78 +3655,91 @@ class DBManager:
         """Default DB 트리뷰 표시 업데이트 - 순차 번호 포함"""
         if not hasattr(self, 'default_db_tree'):
             return
-            
+
         # 기존 항목 삭제
         for item in self.default_db_tree.get_children():
             self.default_db_tree.delete(item)
-        
+
         if default_values is None:
             self.default_db_status_label.config(text="No parameters found for this equipment type.")
             return
-        
+
         # Performance 필터 적용
         if hasattr(self, 'show_performance_only_var') and self.show_performance_only_var.get():
             default_values = [item for item in default_values if len(item) > 14 and item[14] == 1]
-        
-        # 🔍 필터 기능을 위한 원본 데이터 저장 (새로운 기능)
+
+        # 필터 기능을 위한 원본 데이터 저장
         if hasattr(self, 'original_parameter_data'):
-            self.original_parameter_data = []
-            for idx, item in enumerate(default_values, 1):
-                try:
-                    if len(item) >= 15:
-                        # 올바른 SQL 순서에 맞게 파싱
-                        record_id, param_name, default_value, min_spec, max_spec, type_name, occurrence_count, total_files, confidence_score, source_files, description, module_name, part_name, item_type, is_performance = item[:15]
-                        
-                        # Performance 표시
-                        performance_display = "Yes" if is_performance == 1 else "No"
-                        
-                        # 필터용 데이터 구조 (DB 데이터 정확히 매핑)
-                        row_data = [
-                            record_id,  # 0: 실제 DB ID
-                            param_name or "",  # 1: ItemName
-                            module_name or "",  # 2: Module (실제 모듈명)
-                            part_name or "",   # 3: Part
-                            item_type or "double",  # 4: Data Type
-                            str(default_value) if default_value is not None else "",  # 5: Default Value
-                            str(min_spec) if min_spec is not None else "",  # 6: Min Spec
-                            str(max_spec) if max_spec is not None else "",  # 7: Max Spec
-                            performance_display,  # 8: Performance
-                            description or ""  # 9: Description
-                        ]
-                        self.original_parameter_data.append(row_data)
-                        
-                    else:
-                        # 이전 버전 호환성
-                        record_id, param_name, default_value, min_spec, max_spec, occurrence_count = item[:6]
-                        row_data = [
-                            record_id,  # 실제 DB ID
-                            param_name or "",
-                            "", "", "double",
-                            str(default_value) if default_value is not None else "",
-                            str(min_spec) if min_spec is not None else "",
-                            str(max_spec) if max_spec is not None else "",
-                            "No", ""
-                        ]
-                        self.original_parameter_data.append(row_data)
-                        
-                except Exception as e:
-                    self.update_log(f"⚠️ 필터 데이터 준비 중 오류: {e}")
-                    continue
-            
-            # 필터링된 데이터도 초기화 (전체 데이터)
-            self.filtered_parameter_data = self.original_parameter_data.copy()
-            
-            # 필터 옵션 업데이트
-            if hasattr(self, '_update_filter_options'):
-                self._update_filter_options()
-            
-            # 필터 적용 (초기에는 모든 데이터)
-            if hasattr(self, '_apply_parameter_filters'):
-                self._apply_parameter_filters()
+            if self._prepare_filter_data_for_display(default_values):
                 return  # 필터 기능이 있으면 트리뷰 업데이트는 필터에서 처리
-        
-        # 🔍 필터 기능이 없는 경우 기존 방식으로 처리
-        # 순차 번호와 함께 데이터 표시
+
+        # 필터 기능이 없는 경우 기존 방식으로 처리
+        self._insert_tree_items(default_values)
+
+        # 상태 업데이트
+        self._update_display_status(default_values)
+
+    def _prepare_filter_data_for_display(self, default_values):
+        """필터 기능을 위한 원본 데이터 준비"""
+        self.original_parameter_data = []
+        for idx, item in enumerate(default_values, 1):
+            try:
+                if len(item) >= 15:
+                    # 올바른 SQL 순서에 맞게 파싱
+                    record_id, param_name, default_value, min_spec, max_spec, type_name, occurrence_count, total_files, confidence_score, source_files, description, module_name, part_name, item_type, is_performance = item[:15]
+
+                    # Performance 표시
+                    performance_display = "Yes" if is_performance == 1 else "No"
+
+                    # 필터용 데이터 구조 (DB 데이터 정확히 매핑)
+                    row_data = [
+                        record_id,  # 0: 실제 DB ID
+                        param_name or "",  # 1: ItemName
+                        module_name or "",  # 2: Module (실제 모듈명)
+                        part_name or "",   # 3: Part
+                        item_type or "double",  # 4: Data Type
+                        str(default_value) if default_value is not None else "",  # 5: Default Value
+                        str(min_spec) if min_spec is not None else "",  # 6: Min Spec
+                        str(max_spec) if max_spec is not None else "",  # 7: Max Spec
+                        performance_display,  # 8: Performance
+                        description or ""  # 9: Description
+                    ]
+                    self.original_parameter_data.append(row_data)
+
+                else:
+                    # 이전 버전 호환성
+                    record_id, param_name, default_value, min_spec, max_spec, occurrence_count = item[:6]
+                    row_data = [
+                        record_id,  # 실제 DB ID
+                        param_name or "",
+                        "", "", "double",
+                        str(default_value) if default_value is not None else "",
+                        str(min_spec) if min_spec is not None else "",
+                        str(max_spec) if max_spec is not None else "",
+                        "No", ""
+                    ]
+                    self.original_parameter_data.append(row_data)
+
+            except Exception as e:
+                self.update_log(f"⚠️ 필터 데이터 준비 중 오류: {e}")
+                continue
+
+        # 필터링된 데이터도 초기화 (전체 데이터)
+        self.filtered_parameter_data = self.original_parameter_data.copy()
+
+        # 필터 옵션 업데이트
+        if hasattr(self, '_update_filter_options'):
+            self._update_filter_options()
+
+        # 필터 적용 (초기에는 모든 데이터)
+        if hasattr(self, '_apply_parameter_filters'):
+            self._apply_parameter_filters()
+            return True  # 필터 기능이 있으면 트리뷰 업데이트는 필터에서 처리
+
+        return False
+
+    def _insert_tree_items(self, default_values):
+        """트리뷰에 항목 삽입"""
         for idx, item in enumerate(default_values, 1):
             try:
                 # Phase 1.5: Scope 정보 추출 (16번째 요소)
@@ -3720,10 +3766,10 @@ class DBManager:
                         performance_display,
                         description or ""
                     )
-                    
+
                     # 실제 DB ID는 item의 tags로 저장 (내부 관리용)
                     self.default_db_tree.insert("", "end", values=values, tags=(f"id_{record_id}",))
-                    
+
                 else:
                     # 이전 버전 호환성
                     record_id, param_name, default_value, min_spec, max_spec, occurrence_count = item[:6]
@@ -3738,18 +3784,19 @@ class DBManager:
                         "No", ""
                     )
                     self.default_db_tree.insert("", "end", values=values, tags=(f"id_{record_id}",))
-                    
+
             except Exception as e:
                 self.update_log(f"⚠️ 항목 표시 중 오류: {e}")
                 continue
-        
-        # 상태 업데이트
+
+    def _update_display_status(self, default_values):
+        """Default DB 표시 상태 업데이트"""
         total_count = len(default_values)
         performance_count = sum(1 for item in default_values if len(item) > 14 and item[14] == 1)
-        
+
         self.default_db_status_label.config(text=f"총 {total_count}개 파라미터 로드됨")
         self.performance_stats_label.config(text=f"🎯 Check list: {performance_count}개")
-        
+
         self.update_log(f"✅ Default DB 표시 업데이트 완료: {total_count}개 항목 (Check list: {performance_count}개)")
 
     def add_equipment_type_dialog(self):
