@@ -510,6 +510,39 @@ DB Manager는 반도체 장비의 **전체 생명주기 DB 관리 솔루션**입
 
 **커밋**: feat: Phase 2 Week 4 Day 4-5 - Shipped Equipment UI (bc55eb6)
 
+### Week 4 Bug Fixes (2025-11-16)
+**발견 및 수정**: UI 통합 테스트 중 2건의 버그 발견 및 즉시 수정
+
+#### Bug Fix 1: log_change_history 메서드 누락 (commit a2638f5)
+- **증상**: Equipment Type 추가 시 `'DBSchema' object has no attribute 'log_change_history'` 에러
+- **원인**: `manager.py`의 8개 위치에서 `log_change_history()` 호출하나 메서드 미구현
+  - Phase 1에서 `_log_checklist_audit()` 만 구현되어 일반 변경 이력 추적 불가
+- **해결**: `src/app/schema.py`에 `log_change_history()` 메서드 추가 (38 lines)
+  - 기존 `_log_checklist_audit()` 래퍼로 구현
+  - Action 매핑: add→ADD, update→MODIFY, delete→REMOVE, bulk_add→ADD
+  - `Checklist_Audit_Log` 테이블 재사용
+- **테스트**: Syntax 검증 통과, Equipment Type 추가 정상 작동 확인
+
+#### Bug Fix 2: Default DB 탭 미생성 (commit d3e9950)
+- **증상**: Equipment Type 추가 성공하나 UI 리스트에 표시 안 됨, Refresh 버튼 무응답
+- **원인**: QC 모드 활성화 후 관리자 모드 진입 시 Default DB 탭 생성 생략
+  - `enter_admin_mode()`에서 `maint_mode=True`일 때 `enable_maint_features()` 호출 안 함
+  - `equipment_type_combo`가 존재하지 않아 `refresh_equipment_types()` UI 업데이트 스킵
+- **해결**: `src/app/manager.py`의 `enter_admin_mode()` 수정 (5 lines 추가)
+  - `admin_mode=True` 설정 후 `default_db_frame` 존재 체크
+  - 없으면 `create_default_db_tab()` 명시적 호출
+  - QC 모드 활성화 여부와 무관하게 Default DB 탭 보장
+- **영향**: 모든 관리자 모드 진입 시나리오에서 Default DB 탭 자동 생성
+  - 시나리오 1: 생산 모드 → 관리자 모드 (기존 동작 유지)
+  - 시나리오 2: QC 모드 → 관리자 모드 (신규 수정)
+  - 시나리오 3: 생산 모드 → QC 모드 → 관리자 모드 (신규 수정)
+
+**총 수정**: 2개 파일, 43 lines 추가
+- `src/app/schema.py`: +38 lines (log_change_history 메서드)
+- `src/app/manager.py`: +5 lines (Default DB 탭 생성 보장)
+
+**상태**: ✅ 두 버그 모두 수정 완료, Equipment Type 관리 정상 작동 확인
+
 ### Phase 2: Raw Data Management ✅ **Week 4 완료** (2025-11-15 시작, 3일 소요)
 **예상 작업량**:
 - 신규 테이블: 2개 (Shipped_Equipment, Shipped_Equipment_Parameters)
