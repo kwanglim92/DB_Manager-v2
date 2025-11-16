@@ -88,6 +88,9 @@ class ComparisonTab:
         self.create_full_list_tab()
         self.create_diff_only_tab()
 
+        # Context 메뉴 생성 (Full List Tab에서 사용)
+        self.create_comparison_context_menu()
+
     # ==================== Grid View Tab (메인 비교) ====================
 
     def create_grid_view_tab(self):
@@ -158,25 +161,14 @@ class ComparisonTab:
         """
         전체 목록 탭 생성 - 플랫 리스트 + 필터/검색
 
-        Features:
-        - 검색 기능 (ItemName 기반)
-        - 고급 필터 (Module, Part)
-        - Context 메뉴 (Default DB 전송, 복사 등)
-        - 선택 기능 (관리자 모드)
-
-        TODO: manager.py:1632-2100 코드 이관 필요 (약 470 lines)
-        - _create_comparison_filter_panel()
-        - _create_comparison_advanced_filters()
-        - _toggle_comparison_advanced_filters()
-        - _apply_comparison_filters()
-        - _reset_comparison_filters()
-        - _update_comparison_filter_options()
-        - create_comparison_context_menu()
-        - show_comparison_context_menu()
-        - update_comparison_context_menu_state()
+        manager.py:1632-1741에서 이관
         """
         comparison_frame = ttk.Frame(self.notebook)
         self.notebook.add(comparison_frame, text="📋 전체 목록")
+
+        # 스타일 설정
+        style = ttk.Style()
+        style.configure("Custom.Treeview", rowheight=22)
 
         # 상단 검색 및 제어 패널
         top_frame = ttk.Frame(comparison_frame)
@@ -198,11 +190,101 @@ class ComparisonTab:
         self.search_result_label = ttk.Label(search_frame, text="", foreground="#1976D2", font=('Segoe UI', 8))
         self.search_result_label.pack(side=tk.LEFT, padx=(5, 0))
 
-        # TODO: 필터 컨트롤 추가
-        # TODO: 트리뷰 추가
-        # TODO: Context 메뉴 추가
+        # 필터 컨트롤 영역
+        self.comparison_advanced_filter_visible = tk.BooleanVar(value=False)
 
-        self.logger.info("Full List Tab created (skeleton)")
+        control_frame = ttk.Frame(search_frame)
+        control_frame.pack(side=tk.RIGHT, padx=(10, 0))
+
+        # 결과 표시 레이블
+        self.comparison_filter_result_label = ttk.Label(control_frame, text="", foreground="#1976D2", font=('Segoe UI', 8))
+        self.comparison_filter_result_label.pack(side=tk.LEFT, padx=(0, 10))
+
+        # Advanced Filter 토글 버튼
+        self.comparison_toggle_advanced_btn = ttk.Button(
+            control_frame,
+            text="▼ Filters",
+            command=self._toggle_comparison_advanced_filters
+        )
+        self.comparison_toggle_advanced_btn.pack(side=tk.LEFT, padx=(0, 5))
+
+        # Reset 버튼
+        filter_reset_btn = ttk.Button(control_frame, text="Reset", command=self._reset_comparison_filters)
+        filter_reset_btn.pack(side=tk.LEFT)
+
+        # 고급 필터 패널 생성
+        self._create_comparison_filter_panel(comparison_frame)
+
+        # 제어 프레임
+        control_frame = ttk.Frame(comparison_frame)
+        control_frame.pack(fill=tk.X, padx=5, pady=5)
+
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+
+        if maint_mode:
+            self.select_all_var = tk.BooleanVar(value=False)
+            self.select_all_cb = ttk.Checkbutton(
+                control_frame,
+                text="모두 선택",
+                variable=self.select_all_var,
+                command=self.toggle_select_all_checkboxes
+            )
+            self.select_all_cb.pack(side=tk.LEFT, padx=5)
+
+        if maint_mode:
+            self.selected_count_label = ttk.Label(control_frame, text="선택된 항목: 0개")
+            self.selected_count_label.pack(side=tk.RIGHT, padx=10)
+            self.send_to_default_btn = ttk.Button(
+                control_frame,
+                text="Default DB로 전송",
+                command=self.add_to_default_db
+            )
+            self.send_to_default_btn.pack(side=tk.RIGHT, padx=10)
+        else:
+            self.diff_count_label = ttk.Label(control_frame, text="값이 다른 항목: 0개")
+            self.diff_count_label.pack(side=tk.RIGHT, padx=10)
+
+        # 트리뷰 생성
+        file_names = getattr(self.manager, 'file_names', [])
+        if maint_mode:
+            columns = ["Checkbox", "Module", "Part", "ItemName"] + file_names
+        else:
+            columns = ["Module", "Part", "ItemName"] + file_names
+
+        self.comparison_tree = ttk.Treeview(comparison_frame, selectmode="extended", style="Custom.Treeview")
+        self.comparison_tree["columns"] = columns
+        self.comparison_tree.heading("#0", text="", anchor="w")
+        self.comparison_tree.column("#0", width=0, stretch=False)
+
+        col_offset = 0
+        if maint_mode:
+            self.comparison_tree.heading("Checkbox", text="선택")
+            self.comparison_tree.column("Checkbox", width=50, anchor="center")
+            col_offset = 1
+
+        for col in ["Module", "Part", "ItemName"]:
+            self.comparison_tree.heading(col, text=col, anchor="w")
+            self.comparison_tree.column(col, width=100)
+
+        for model in file_names:
+            self.comparison_tree.heading(model, text=model, anchor="w")
+            self.comparison_tree.column(model, width=150)
+
+        # 스크롤바
+        v_scroll = ttk.Scrollbar(comparison_frame, orient="vertical", command=self.comparison_tree.yview)
+        h_scroll = ttk.Scrollbar(comparison_frame, orient="horizontal", command=self.comparison_tree.xview)
+        self.comparison_tree.configure(yscroll=v_scroll.set, xscroll=h_scroll.set)
+
+        v_scroll.pack(side=tk.RIGHT, fill=tk.Y)
+        h_scroll.pack(side=tk.BOTTOM, fill=tk.X)
+        self.comparison_tree.pack(expand=True, fill=tk.BOTH)
+
+        # 이벤트 바인딩
+        self.comparison_tree.bind("<<TreeviewSelect>>", self.update_selected_count)
+
+        # TODO: Context 메뉴 추가 (Day 4)
+
+        self.logger.info("Full List Tab created")
 
     # ==================== Diff Only Tab (차이점 분석) ====================
 
@@ -544,27 +626,559 @@ class ComparisonTab:
         for item in treeview.get_children():
             treeview.delete(item)
 
+    # ==================== Filter Panel Methods ====================
+
+    def _create_comparison_filter_panel(self, parent_frame):
+        """전체 목록 탭 필터 패널 생성
+
+        manager.py:1743-1766에서 이관
+        """
+        try:
+            # 메인 필터 컨테이너 프레임
+            self.comparison_main_filter_container = ttk.Frame(parent_frame)
+            self.comparison_main_filter_container.pack(fill=tk.X, pady=(0, 5), padx=10)
+
+            # 구분선 추가
+            separator = ttk.Separator(self.comparison_main_filter_container, orient='horizontal')
+            separator.pack(fill=tk.X, pady=(5, 8))
+
+            # 고급 필터 패널 (처음에는 숨김)
+            self.comparison_advanced_filter_frame = ttk.Frame(self.comparison_main_filter_container)
+
+            # 고급 필터 내용 생성
+            self._create_comparison_advanced_filters()
+
+            self.logger.debug("Filter panel created - advanced filter hidden by default")
+
+        except Exception as e:
+            self.logger.error(f"Comparison filter panel error: {e}")
+            import traceback
+            traceback.print_exc()
+
+    def _create_comparison_advanced_filters(self):
+        """전체 목록 탭 고급 필터 생성
+
+        manager.py:1768-1805에서 이관
+        """
+        try:
+            # 구분선
+            filter_separator = ttk.Separator(self.comparison_advanced_filter_frame, orient='horizontal')
+            filter_separator.pack(fill=tk.X, pady=(5, 8))
+
+            # 필터 행
+            filters_row = ttk.Frame(self.comparison_advanced_filter_frame)
+            filters_row.pack(fill=tk.X, pady=(0, 8))
+
+            # Module Filter
+            module_frame = ttk.Frame(filters_row)
+            module_frame.pack(side=tk.LEFT, padx=(0, 20))
+
+            ttk.Label(module_frame, text="Module:", font=('Segoe UI', 8)).pack(anchor='w')
+            self.comparison_module_filter_var = tk.StringVar()
+            self.comparison_module_filter_combo = ttk.Combobox(module_frame, textvariable=self.comparison_module_filter_var,
+                                                      state="readonly", width=12, font=('Segoe UI', 8))
+            self.comparison_module_filter_combo.pack()
+            self.comparison_module_filter_combo.bind('<<ComboboxSelected>>', self._apply_comparison_filters)
+
+            # Part Filter
+            part_frame = ttk.Frame(filters_row)
+            part_frame.pack(side=tk.LEFT, padx=(0, 20))
+
+            ttk.Label(part_frame, text="Part:", font=('Segoe UI', 8)).pack(anchor='w')
+            self.comparison_part_filter_var = tk.StringVar()
+            self.comparison_part_filter_combo = ttk.Combobox(part_frame, textvariable=self.comparison_part_filter_var,
+                                                    state="readonly", width=12, font=('Segoe UI', 8))
+            self.comparison_part_filter_combo.pack()
+            self.comparison_part_filter_combo.bind('<<ComboboxSelected>>', self._apply_comparison_filters)
+
+        except Exception as e:
+            self.logger.error(f"Comparison advanced filters error: {e}")
+
+    def _toggle_comparison_advanced_filters(self):
+        """전체 목록 탭 고급 필터 토글
+
+        manager.py:1807-1831에서 이관
+        """
+        try:
+            self.logger.debug(f"Toggle called - Current state: {self.comparison_advanced_filter_visible.get()}")
+
+            if self.comparison_advanced_filter_visible.get():
+                # 현재 보이는 상태 → 숨기기
+                self.logger.debug("Hiding advanced filters")
+                self.comparison_advanced_filter_frame.pack_forget()
+                self.comparison_toggle_advanced_btn.config(text="▼ Filters")
+                self.comparison_advanced_filter_visible.set(False)
+            else:
+                # 현재 숨겨진 상태 → 보이기
+                self.logger.debug("Showing advanced filters")
+                self.comparison_advanced_filter_frame.pack(fill=tk.X, pady=(0, 5))
+                self.comparison_toggle_advanced_btn.config(text="▲ Filters")
+                self.comparison_advanced_filter_visible.set(True)
+
+            # UI 업데이트 강제 실행
+            if hasattr(self, 'comparison_main_filter_container'):
+                self.comparison_main_filter_container.update_idletasks()
+            if hasattr(self, 'manager') and hasattr(self.manager, 'window'):
+                self.manager.window.update_idletasks()
+
+            self.logger.debug(f"Toggle complete - New state: {self.comparison_advanced_filter_visible.get()}")
+
+        except Exception as e:
+            self.logger.error(f"Toggle filters error: {e}")
+
+    def _apply_comparison_filters(self, *args):
+        """전체 목록 탭 필터 적용
+
+        manager.py:1838-1845에서 이관
+        """
+        try:
+            # 기존 검색 필터와 함께 Module, Part 필터 적용
+            self.on_search_changed()
+
+        except Exception as e:
+            self.logger.error(f"Comparison filters apply error: {e}")
+
+    def _reset_comparison_filters(self):
+        """전체 목록 탭 모든 필터 초기화
+
+        manager.py:1847-1864에서 이관
+        """
+        try:
+            # 검색 초기화
+            if hasattr(self, 'search_var'):
+                self.search_var.set("")
+
+            # 필터 초기화
+            if hasattr(self, 'comparison_module_filter_var'):
+                self.comparison_module_filter_var.set("All")
+            if hasattr(self, 'comparison_part_filter_var'):
+                self.comparison_part_filter_var.set("All")
+
+            # 필터 적용
+            self._apply_comparison_filters()
+
+        except Exception as e:
+            self.logger.error(f"Comparison filters reset error: {e}")
+
+    def _update_comparison_filter_options(self):
+        """전체 목록 탭 필터 옵션 업데이트
+
+        manager.py:1866-1891에서 이관
+        """
+        try:
+            merged_df = getattr(self.manager, 'merged_df', None)
+            if merged_df is None:
+                return
+
+            # Module 옵션 업데이트
+            if 'Module' in merged_df.columns:
+                modules = sorted(merged_df['Module'].dropna().unique())
+                module_values = ["All"] + list(modules)
+                if hasattr(self, 'comparison_module_filter_combo'):
+                    self.comparison_module_filter_combo['values'] = module_values
+                    if not self.comparison_module_filter_var.get():
+                        self.comparison_module_filter_var.set("All")
+
+            # Part 옵션 업데이트
+            if 'Part' in merged_df.columns:
+                parts = sorted(merged_df['Part'].dropna().unique())
+                part_values = ["All"] + list(parts)
+                if hasattr(self, 'comparison_part_filter_combo'):
+                    self.comparison_part_filter_combo['values'] = part_values
+                    if not self.comparison_part_filter_var.get():
+                        self.comparison_part_filter_var.set("All")
+
+        except Exception as e:
+            self.logger.error(f"Comparison filter options update error: {e}")
+
     # ==================== Search & Filter Methods ====================
 
     def on_search_changed(self, event=None):
-        """
-        검색어 변경 시 호출
+        """검색어 변경 시 필터링
 
-        TODO: manager.py:2469 코드 이관 (Full List Tab에서 구현 예정)
+        manager.py:2469-2472에서 이관
         """
-        search_text = self.search_var.get()
-        # TODO: Implement search logic
-        self.logger.debug(f"Search changed: {search_text}")
+        search_text = self.search_var.get().lower().strip()
+        self.update_comparison_view(search_filter=search_text)
 
     def clear_search(self):
-        """
-        검색 초기화
+        """검색 입력창 지우기
 
-        TODO: manager.py:2474 코드 이관 (Full List Tab에서 구현 예정)
+        manager.py:2474-2477에서 이관
         """
         self.search_var.set("")
-        # TODO: Reset search filter
-        self.logger.debug("Search cleared")
+        self.update_comparison_view(search_filter="")
+
+    # ==================== Full List Update Methods ====================
+
+    def update_comparison_view(self, search_filter=""):
+        """비교 뷰 업데이트
+
+        manager.py:2493-2502에서 이관
+        """
+        # 트리뷰 초기화
+        saved_checkboxes = self._initialize_comparison_tree()
+
+        # 데이터 처리
+        diff_count, total_items, filtered_items = self._process_comparison_items(search_filter, saved_checkboxes)
+
+        # 상태 업데이트
+        self._update_comparison_status(diff_count, total_items, filtered_items, search_filter)
+
+        # 필터 옵션 업데이트
+        self._update_comparison_filter_options()
+
+    def _initialize_comparison_tree(self):
+        """비교 트리뷰 초기화 - 체크박스 상태 저장 및 반환
+
+        manager.py:2504-2517에서 이관
+        """
+        if not hasattr(self, 'comparison_tree') or self.comparison_tree is None:
+            return {}
+
+        self._clear_treeview(self.comparison_tree)
+
+        saved_checkboxes = self.item_checkboxes.copy()
+        self.item_checkboxes.clear()
+
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if maint_mode:
+            self.comparison_tree.bind("<ButtonRelease-1>", self.toggle_checkbox)
+        else:
+            self.comparison_tree.unbind("<ButtonRelease-1>")
+
+        return saved_checkboxes
+
+    def _process_comparison_items(self, search_filter, saved_checkboxes):
+        """비교 항목 처리 및 트리에 삽입 - 통계 반환
+
+        manager.py:2519-2601에서 이관
+        """
+        diff_count = 0
+        total_items = 0
+        filtered_items = 0
+
+        merged_df = getattr(self.manager, 'merged_df', None)
+        file_names = getattr(self.manager, 'file_names', [])
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+
+        if merged_df is None:
+            return diff_count, total_items, filtered_items
+
+        # 파라미터별로 그룹화하여 비교
+        grouped = merged_df.groupby(["Module", "Part", "ItemName"])
+
+        for (module, part, item_name), group in grouped:
+            total_items += 1
+
+            # 검색 필터링 적용
+            if search_filter and search_filter not in item_name.lower():
+                continue
+
+            # Module 필터링 적용
+            if hasattr(self, 'comparison_module_filter_var'):
+                module_filter = self.comparison_module_filter_var.get()
+                if module_filter and module_filter != "All" and module != module_filter:
+                    continue
+
+            # Part 필터링 적용
+            if hasattr(self, 'comparison_part_filter_var'):
+                part_filter = self.comparison_part_filter_var.get()
+                if part_filter and part_filter != "All" and part != part_filter:
+                    continue
+
+            filtered_items += 1
+
+            values = []
+
+            if maint_mode:
+                checkbox_state = "☐"
+                item_key = f"{module}_{part}_{item_name}"
+                if item_key in saved_checkboxes and saved_checkboxes[item_key]:
+                    checkbox_state = "☑"
+                self.item_checkboxes[item_key] = (checkbox_state == "☑")
+                values.append(checkbox_state)
+
+            values.extend([module, part, item_name])
+
+            # 각 파일별 값 추출 및 비교
+            file_values = []
+            for model in file_names:
+                model_data = group[group["Model"] == model]
+                if not model_data.empty:
+                    value = model_data["ItemValue"].iloc[0]
+                    file_values.append(str(value))
+                else:
+                    file_values.append("-")
+
+            values.extend(file_values)
+
+            # 차이점 검사 - 모든 값이 동일한지 확인
+            unique_values = set(v for v in file_values if v != "-")
+            has_difference = len(unique_values) > 1
+
+            tags = []
+            if has_difference:
+                tags.append("different")
+                diff_count += 1
+
+            # Default DB에 존재하는지 확인
+            is_existing = self._check_if_parameter_exists(module, part, item_name)
+            if is_existing:
+                tags.append("existing")
+
+            self.comparison_tree.insert("", "end", values=values, tags=tuple(tags))
+
+        # 스타일 설정
+        self.comparison_tree.tag_configure("different", background="#FFECB3", foreground="#E65100")
+        self.comparison_tree.tag_configure("existing", foreground="#1976D2")
+
+        if maint_mode:
+            self.comparison_tree.bind("<ButtonRelease-1>", self.toggle_checkbox)
+
+        self.update_selected_count(None)
+
+        return diff_count, total_items, filtered_items
+
+    def _update_comparison_status(self, diff_count, total_items, filtered_items, search_filter):
+        """비교 뷰 상태 레이블 업데이트
+
+        manager.py:2603-2619에서 이관
+        """
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+
+        # 차이점 카운트 업데이트
+        if not maint_mode and hasattr(self, 'diff_count_label'):
+            self.diff_count_label.config(text=f"값이 다른 항목: {diff_count}개")
+
+        # 검색 결과 표시 업데이트
+        if hasattr(self, 'search_result_label'):
+            if search_filter:
+                self.search_result_label.config(text=f"검색 결과: {filtered_items}개 (전체: {total_items}개)")
+            else:
+                self.search_result_label.config(text="")
+
+        # 필터 결과 표시 업데이트
+        if hasattr(self, 'comparison_filter_result_label'):
+            module_filter = getattr(self, 'comparison_module_filter_var', tk.StringVar()).get()
+            part_filter = getattr(self, 'comparison_part_filter_var', tk.StringVar()).get()
+
+            if (module_filter and module_filter != "All") or (part_filter and part_filter != "All"):
+                self.comparison_filter_result_label.config(text=f"필터링됨: {filtered_items}개 (전체: {total_items}개)")
+            else:
+                self.comparison_filter_result_label.config(text="")
+
+    def _check_if_parameter_exists(self, module, part, item_name):
+        """Default DB에 파라미터 존재 여부 확인
+
+        manager.py:2697-2710에서 이관
+        """
+        try:
+            db_schema = getattr(self.manager, 'db_schema', None)
+            if not db_schema:
+                return False
+
+            equipment_types = db_schema.get_equipment_types()
+            for type_id, type_name, _ in equipment_types:
+                if type_name.lower() == module.lower():
+                    default_values = db_schema.get_default_values(type_id)
+                    for _, param_name, _, _, _, _ in default_values:
+                        # ItemName만으로 체크
+                        if param_name == item_name:
+                            return True
+            return False
+        except Exception as e:
+            self.logger.error(f"DB ItemName 존재 여부 확인 중 오류: {e}")
+            return False
+
+    # ==================== Checkbox Methods ====================
+
+    def toggle_checkbox(self, event):
+        """체크박스 토글
+
+        manager.py:2655-2678에서 이관
+        """
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            return
+
+        region = self.comparison_tree.identify_region(event.x, event.y)
+        if region != "cell":
+            return
+
+        column = self.comparison_tree.identify_column(event.x)
+        if column != "#1":
+            return
+
+        item = self.comparison_tree.identify_row(event.y)
+        if not item:
+            return
+
+        values = self.comparison_tree.item(item, "values")
+        if not values or len(values) < 4:
+            return
+
+        current_state = values[0]
+        module, part, item_name = values[1], values[2], values[3]
+        item_key = f"{module}_{part}_{item_name}"
+        new_state = "☑" if current_state == "☐" else "☐"
+        self.item_checkboxes[item_key] = (new_state == "☑")
+        new_values = list(values)
+        new_values[0] = new_state
+        self.comparison_tree.item(item, values=new_values)
+        self.update_checked_count()
+
+    def toggle_select_all_checkboxes(self):
+        """전체 선택 체크박스 토글
+
+        manager.py:2479-2492에서 이관
+        """
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            return
+
+        check = self.select_all_var.get()
+        for item in self.comparison_tree.get_children():
+            values = list(self.comparison_tree.item(item, "values"))
+            if len(values) > 0:
+                values[0] = "☑" if check else "☐"
+                self.comparison_tree.item(item, values=values)
+                module, part, item_name = values[1], values[2], values[3]
+                item_key = f"{module}_{part}_{item_name}"
+                self.item_checkboxes[item_key] = check
+
+        self.update_checked_count()
+
+    def update_selected_count(self, event):
+        """선택된 항목 카운트 업데이트
+
+        manager.py:2680-2689에서 이관
+        """
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            return
+
+        if not hasattr(self, 'selected_count_label'):
+            return
+
+        checked_count = sum(1 for checked in self.item_checkboxes.values() if checked)
+        if checked_count > 0:
+            self.selected_count_label.config(text=f"체크된 항목: {checked_count}개")
+        else:
+            selected_items = self.comparison_tree.selection()
+            count = len(selected_items)
+            self.selected_count_label.config(text=f"선택된 항목: {count}개")
+
+    def update_checked_count(self):
+        """체크된 항목 카운트 업데이트
+
+        manager.py:2691-2695에서 이관
+        """
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            return
+
+        if not hasattr(self, 'selected_count_label'):
+            return
+
+        checked_count = sum(1 for checked in self.item_checkboxes.values() if checked)
+        self.selected_count_label.config(text=f"체크된 항목: {checked_count}개")
+
+    # ==================== Default DB Methods ====================
+
+    def add_to_default_db(self):
+        """체크된 항목들을 Default DB로 전송 - 중복도 기반 통계 분석
+
+        manager.py:2022-2232에서 이관
+
+        복잡한 비즈니스 로직(통계 분석, DB 저장)은 manager에 위임하고,
+        UI 구성만 담당합니다.
+        """
+        # 관리자 모드 확인
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            messagebox.showwarning("권한 없음", "Default DB 항목 추가는 관리자 모드에서만 가능합니다.")
+            return
+
+        # manager에 구현된 메서드 위임
+        # manager.py의 add_to_default_db()가 모든 로직 처리:
+        # - 선택된 항목 수집 (_collect_selected_comparison_items)
+        # - 장비 유형 선택 다이얼로그
+        # - 통계 분석 설정 다이얼로그
+        # - 미리보기 및 중복 검사
+        # - DB 저장 및 로깅
+        # - UI 갱신
+        if hasattr(self.manager, 'add_to_default_db'):
+            self.manager.add_to_default_db()
+        else:
+            messagebox.showerror("오류", "add_to_default_db 메서드를 찾을 수 없습니다.")
+            self.logger.error("manager.add_to_default_db method not found")
+
+    # ==================== Context Menu ====================
+
+    def create_comparison_context_menu(self):
+        """비교 뷰 우클릭 메뉴 생성
+
+        manager.py:2631-2635에서 이관
+        """
+        self.comparison_context_menu = tk.Menu(self.manager.window, tearoff=0)
+        self.comparison_context_menu.add_command(
+            label="선택한 항목을 Default DB에 추가",
+            command=self.add_to_default_db
+        )
+
+        # 우클릭 이벤트 바인딩
+        if self.comparison_tree:
+            self.comparison_tree.bind("<Button-3>", self.show_comparison_context_menu)
+
+        # 초기 상태 업데이트
+        self.update_comparison_context_menu_state()
+
+        self.logger.debug("Comparison context menu created")
+
+    def show_comparison_context_menu(self, event):
+        """비교 뷰 우클릭 메뉴 표시
+
+        manager.py:2637-2645에서 이관
+
+        Args:
+            event: 마우스 이벤트
+        """
+        # 관리자 모드 확인
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        if not maint_mode:
+            return
+
+        # 선택된 항목 확인
+        if not self.comparison_tree.selection():
+            return
+
+        # 메뉴 표시
+        try:
+            self.comparison_context_menu.tk_popup(event.x_root, event.y_root)
+        finally:
+            self.comparison_context_menu.grab_release()
+
+    def update_comparison_context_menu_state(self):
+        """비교 뷰 컨텍스트 메뉴 상태 업데이트
+
+        manager.py:2647-2653에서 이관
+
+        관리자 모드에 따라 메뉴 항목 활성화/비활성화
+        """
+        if not hasattr(self, 'comparison_context_menu'):
+            return
+
+        maint_mode = getattr(self.manager, 'maint_mode', False)
+        state = "normal" if maint_mode else "disabled"
+
+        try:
+            self.comparison_context_menu.entryconfig(
+                "선택한 항목을 Default DB에 추가",
+                state=state
+            )
+        except Exception as e:
+            self.logger.warning(f"컨텍스트 메뉴 상태 업데이트 중 오류: {e}")
 
     # ==================== Update Methods ====================
 
@@ -576,7 +1190,7 @@ class ComparisonTab:
         """
         self.update_grid_view()
         self.update_diff_only_view()
-        # TODO: update_comparison_view() (Full List Tab, Day 3-4 구현 예정)
+        self.update_comparison_view()
         self.logger.debug("All comparison views updated")
 
     # ==================== Public Interface ====================
@@ -599,7 +1213,7 @@ class ComparisonTab:
 
 # ==================== Migration Notes ====================
 """
-마이그레이션 상태: 🚧 진행중 - Day 2 완료 (70% 진행)
+마이그레이션 상태: ✅ Day 3-4 완료 (100% 진행) - manager.py 통합 대기
 
 완료:
 - ✅ 기본 클래스 구조 및 초기화 (Day 1)
@@ -612,29 +1226,59 @@ class ComparisonTab:
   - _clear_treeview() (helper)
 - ✅ Diff Only Tab 완전 구현 (Day 2) - ~90 lines
   - update_diff_only_view()
+- ✅ Full List Tab 완전 구현 (Day 3-4) - ~470 lines
+  - create_full_list_tab() - 전체 UI 구조 (검색, 필터, 트리뷰)
+  - _create_comparison_filter_panel() - 필터 패널
+  - _create_comparison_advanced_filters() - Module/Part 필터
+  - _toggle_comparison_advanced_filters() - 필터 토글
+  - _apply_comparison_filters() - 필터 적용
+  - _reset_comparison_filters() - 필터 초기화
+  - _update_comparison_filter_options() - 필터 옵션 업데이트
+  - update_comparison_view() - 메인 업데이트
+  - _initialize_comparison_tree() - 트리 초기화
+  - _process_comparison_items() - 항목 처리 및 통계
+  - _update_comparison_status() - 상태 라벨 업데이트
+  - _check_if_parameter_exists() - 파라미터 존재 확인
+  - toggle_checkbox() - 체크박스 토글
+  - toggle_select_all_checkboxes() - 전체 선택
+  - update_selected_count() - 선택 카운트 업데이트
+  - update_checked_count() - 체크 카운트 업데이트
+  - on_search_changed() - 검색 이벤트
+  - clear_search() - 검색 초기화
+- ✅ Default DB 메서드 (Day 4)
+  - add_to_default_db() - manager에 위임
+- ✅ Context 메뉴 (Day 4)
+  - create_comparison_context_menu()
+  - show_comparison_context_menu()
+  - update_comparison_context_menu_state()
 
-진행 예정 (manager.py에서 이관):
-- ⏳ Full List Tab 완전 구현 (Day 3-4) - ~470 lines
-  - 전체 트리뷰 구성
-  - 필터 패널 완전 구현
-  - Context 메뉴
-  - 검색 로직
-  - add_to_default_db() 통합
-  - update_comparison_view()
-
-총 코드량: ~580 lines (목표 ~810 lines의 70%)
+총 코드량: ~1,210 lines (목표 ~810 lines 초과 달성, 150%)
 - Day 1: 200 lines (스켈레톤)
 - Day 2: +380 lines (Grid View + Diff Only)
-
-다음 단계 (Day 3-4):
-1. Full List Tab 트리뷰 완전 구성
-2. 필터 패널 및 검색 로직 구현
-3. Context 메뉴 통합
-4. add_to_default_db() 통합
-5. update_comparison_view() 구현
+- Day 3-4: +470 lines (Full List Tab + Context Menu)
+- Day 4: +160 lines (add_to_default_db + helper methods)
 
 다음 단계 (Day 5):
 1. manager.py에서 ComparisonTab 사용으로 전환
-2. 기존 코드 제거
+   - create_comparison_tabs() 메서드 수정
+   - self.comparison_tab = ComparisonTab(self, self.comparison_notebook) 인스턴스 생성
+   - 기존 비교 관련 메서드를 ComparisonTab으로 리다이렉트
+2. 기존 코드 제거 또는 주석 처리
+   - manager.py:1380-2680 (약 1300 lines) 제거 대상
 3. 테스트 및 검증
+   - 파일 비교 기능
+   - 필터/검색 기능
+   - Default DB 전송 기능
+   - Context 메뉴 동작
+4. 문서 업데이트
+   - UI_MIGRATION_PLAN.md 업데이트
+   - SESSION_SUMMARY 업데이트
+   - 커밋 메시지 작성
+
+설계 결정:
+- add_to_default_db()는 manager.py에 위임:
+  복잡한 통계 분석 로직(analyze_parameter_statistics, add_parameters_with_statistics)은
+  비즈니스 로직이므로 manager에 남겨두고, UI는 단순히 호출만 수행
+- Context 메뉴는 ComparisonTab에서 관리:
+  UI 관련 요소이므로 ComparisonTab에서 직접 생성 및 관리
 """
