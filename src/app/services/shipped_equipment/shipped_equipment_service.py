@@ -591,7 +591,8 @@ class ShippedEquipmentService(IShippedEquipmentService):
         if row[5]:  # ship_date
             try:
                 ship_date_obj = datetime.fromisoformat(row[5]).date()
-            except:
+            except (ValueError, TypeError) as e:
+                # 날짜 파싱 실패 시 None 유지
                 pass
 
         return ShippedEquipment(

@@ -101,7 +101,8 @@ class EnhancedQCValidator:
                 checklist_df_copy = checklist_df.copy()
                 checklist_df_copy['is_checklist_numeric'] = pd.to_numeric(checklist_df_copy['is_checklist'], errors='coerce')
                 checklist_params = checklist_df_copy[checklist_df_copy['is_checklist_numeric'] == 1]
-            except:
+            except Exception as e:
+                # is_checklist 컬럼 변환 실패 시 전체 데이터 사용
                 checklist_params = checklist_df
         else:
             checklist_params = checklist_df
@@ -140,7 +141,8 @@ class EnhancedQCValidator:
             # 파라미터명으로 매칭 시도
             try:
                 matching_params = file_df[file_df[param_column].str.contains(param_name, case=False, na=False)]
-            except:
+            except (AttributeError, TypeError) as e:
+                # str.contains 실패 시 (숫자 컬럼 등) exact match 사용
                 matching_params = file_df[file_df[param_column] == param_name]
             
             if matching_params.empty:

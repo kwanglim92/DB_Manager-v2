@@ -277,7 +277,8 @@ class ChecklistManagerDialog:
                                 expected_display = " / ".join(str(v) for v in parsed)
                             else:
                                 expected_display = expected_value
-                        except:
+                        except (json.JSONDecodeError, ValueError) as e:
+                            # JSON 파싱 실패 시 원본 값 사용
                             expected_display = expected_value
                     else:
                         expected_display = "N/A"

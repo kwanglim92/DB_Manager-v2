@@ -2544,17 +2544,19 @@ class DBManager:
                 try:
                     del self.qc_notebook
                     self.update_log("✅ QC 노트북 참조 제거 완료")
-                except:
+                except Exception as e:
+                    # QC 노트북 삭제 실패 시 무시
                     pass
-            
+
             # QC 관련 위젯 참조 제거
-            qc_widgets = ['qc_type_var', 'qc_type_combobox', 'qc_result_tree', 
+            qc_widgets = ['qc_type_var', 'qc_type_combobox', 'qc_result_tree',
                          'stats_frame', 'chart_frame']
             for widget_name in qc_widgets:
                 if hasattr(self, widget_name):
                     try:
                         delattr(self, widget_name)
-                    except:
+                    except Exception as e:
+                        # 위젯 삭제 실패 시 무시
                         pass
             
             # 유지보수 모드 비활성화
@@ -3233,7 +3235,8 @@ class DBManager:
                     perf_ratio = (perf_count / total_count * 100) if total_count > 0 else 0
                     stats_text = f"🎯 Performance: {perf_count}/{total_count} ({perf_ratio:.1f}%)"
                     self.performance_stats_label.config(text=stats_text)
-                except:
+                except (IndexError, TypeError, AttributeError) as e:
+                    # 통계 계산 실패 시 빈 문자열 표시
                     self.performance_stats_label.config(text="")
             self.update_log(f"📊 조회된 파라미터 수: {len(default_values)}개")
             
@@ -4694,23 +4697,27 @@ class DBManager:
                             if label == "QC 관리":
                                 menu_found = True
                                 break
-                        except:
+                        except tk.TclError:
+                            # 메뉴 인덱스 범위 초과 시 검색 중단
                             break
-                except:
+                except Exception as e:
+                    # 메뉴 검색 실패 시 무시
                     pass
-                
+
                 if not menu_found:
                     # 도구 메뉴 앞에 QC 관리 메뉴 삽입
                     try:
                         current_menubar.insert_cascade(2, label="QC 관리", menu=self.qc_menu)
-                    except:
+                    except tk.TclError:
+                        # 인덱스 삽입 실패 시 마지막에 추가
                         current_menubar.add_cascade(label="QC 관리", menu=self.qc_menu)
-            
+
             # QC 메뉴 항목들 활성화
             for i in range(self.qc_menu.index('end') + 1):
                 try:
                     self.qc_menu.entryconfig(i, state="normal")
-                except:
+                except tk.TclError:
+                    # 메뉴 항목 활성화 실패 시 무시
                     pass
                     
         except Exception as e:
@@ -4724,9 +4731,10 @@ class DBManager:
                 for i in range(self.qc_menu.index('end') + 1):
                     try:
                         self.qc_menu.entryconfig(i, state="disabled")
-                    except:
+                    except tk.TclError:
+                        # 메뉴 항목 비활성화 실패 시 무시
                         pass
-            
+
             # QC 메뉴를 메뉴바에서 제거
             current_menubar = self.window['menu']
             if current_menubar:
@@ -4737,9 +4745,11 @@ class DBManager:
                             if label == "QC 관리":
                                 current_menubar.delete(i)
                                 break
-                        except:
+                        except tk.TclError:
+                            # 메뉴 인덱스 범위 초과 시 검색 중단
                             break
-                except:
+                except Exception as e:
+                    # 메뉴 제거 실패 시 무시
                     pass
                     
         except Exception as e:

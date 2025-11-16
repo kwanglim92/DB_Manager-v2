@@ -172,7 +172,8 @@ def add_comparison_filter_functions_to_class(cls):
             # 에러 시 기본 뷰 업데이트 시도
             try:
                 self.update_comparison_view()
-            except:
+            except Exception as update_err:
+                # 기본 뷰 업데이트도 실패 시 조용히 무시
                 pass
 
     def _update_comparison_view_with_filters(self, search_filter="", module_filter="", part_filter=""):
@@ -303,7 +304,8 @@ def add_comparison_filter_functions_to_class(cls):
             # 에러 시 기본 뷰 업데이트 시도
             try:
                 self.update_comparison_view()
-            except:
+            except Exception as update_err:
+                # 기본 뷰 업데이트도 실패 시 조용히 무시
                 pass
 
     def _update_comparison_filter_options(self):

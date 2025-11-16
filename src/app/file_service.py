@@ -153,7 +153,8 @@ def load_and_merge_files(file_paths):
             root = tk.Tk()
             root.withdraw()
         loading_dialog = LoadingDialog(root)
-    except:
+    except Exception as e:
+        # LoadingDialog 생성 실패 시 (Tkinter 환경 문제 등)
         loading_dialog = None
     
     if loading_dialog:

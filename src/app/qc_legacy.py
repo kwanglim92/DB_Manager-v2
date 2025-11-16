@@ -636,7 +636,7 @@ def add_qc_check_functions_to_class(cls):
                     import os
                     file_size = os.path.getsize(filepath)
                     file_size_str = f"{file_size:,} bytes"
-                    
+
                     path_label = ttk.Label(
                         file_info_frame,
                         text=f"📁 {filepath} ({file_size_str})",
@@ -644,7 +644,8 @@ def add_qc_check_functions_to_class(cls):
                         foreground='gray'
                     )
                     path_label.pack(anchor='w')
-                except:
+                except (OSError, IOError) as e:
+                    # 파일 크기 조회 실패 시 크기 없이 표시
                     path_label = ttk.Label(
                         file_info_frame,
                         text=f"📁 {filepath}",

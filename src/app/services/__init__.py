@@ -84,7 +84,8 @@ class LegacyAdapter:
             from ..core.config import AppConfig
             config = AppConfig()
             return config.get_setting('USE_NEW_SERVICES', False)
-        except:
+        except (ImportError, AttributeError) as e:
+            # AppConfig 로드 실패 시 기본값 False 반환
             return False
     
     def get_equipment_service(self):
@@ -92,7 +93,8 @@ class LegacyAdapter:
         if self._use_new_services:
             try:
                 return self.service_factory.get_equipment_service()
-            except:
+            except (AttributeError, RuntimeError) as e:
+                # 서비스 팩토리 또는 서비스 초기화 실패 시 None 반환
                 return None
         return None
     
@@ -101,7 +103,8 @@ class LegacyAdapter:
         if self._use_new_services:
             try:
                 return self.service_factory.get_logging_service()
-            except:
+            except (AttributeError, RuntimeError) as e:
+                # 서비스 팩토리 또는 서비스 초기화 실패 시 None 반환
                 return None
         return None
 
