@@ -617,9 +617,9 @@ def add_comparison_functions_to_class(cls):
             total_count = len(self.merged_df)
             filtered_count = len(filtered_df)
             self.grid_filter_result_label.config(text=f"표시: {filtered_count}/{total_count} 항목")
-            
+
         except Exception as e:
-            print(f"Grid filters apply error: {e}")
+            logging.error(f"Grid filters apply error: {e}")
 
     def _update_grid_view_with_filtered_data(self, filtered_df):
         """필터링된 데이터로 그리드 뷰 업데이트"""
