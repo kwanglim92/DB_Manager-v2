@@ -1435,90 +1435,68 @@ class DBManager:
         # 격자뷰 데이터 업데이트
         self.update_grid_view()
 
-    def update_grid_view(self):
-        """격자뷰 데이터 업데이트 - 트리뷰 구조"""
-        if not hasattr(self, 'grid_tree'):
-            return
-            
-        # 기존 데이터 삭제
-        for item in self.grid_tree.get_children():
-            self.grid_tree.delete(item)
-        
-        if self.merged_df is None or self.merged_df.empty:
-            # 통계 정보 초기화
-            if hasattr(self, 'grid_total_label'):
-                self.grid_total_label.config(text="총 파라미터: 0개")
-                self.grid_modules_label.config(text="모듈 수: 0개") 
-                self.grid_parts_label.config(text="파트 수: 0개")
-            return
-        
-        # 동적 컬럼 업데이트
-        columns = tuple(self.file_names) if self.file_names else ("값",)
-        self.grid_tree["columns"] = columns
-        
-        # 컬럼 헤딩 업데이트
-        for col in columns:
-            self.grid_tree.heading(col, text=col, anchor="center")
-            self.grid_tree.column(col, width=150, anchor="center")
-        
-        # 계층별 스타일 태그 설정
+    def _configure_grid_view_tags(self):
+        """계층별 스타일 태그 설정 (Grid View)"""
         # 모듈 레벨 - 가장 크고 굵게 (기본 파란색)
-        self.grid_tree.tag_configure("module", 
-                                    font=("Arial", 11, "bold"), 
-                                    background="#F5F5F5", 
+        self.grid_tree.tag_configure("module",
+                                    font=("Arial", 11, "bold"),
+                                    background="#F5F5F5",
                                     foreground="#1565C0")
-        
-        # 모듈 레벨 - 차이 있음 (빨간색 강조)
-        self.grid_tree.tag_configure("module_diff", 
-                                    font=("Arial", 11, "bold"), 
-                                    background="#F5F5F5", 
-                                    foreground="#D32F2F")
-        
-        # 파트 레벨 - 중간 크기, 볼드
-        self.grid_tree.tag_configure("part", 
-                                    font=("Arial", 10, "bold"), 
-                                    background="#FAFAFA", 
-                                    foreground="#424242")
-        
-        # 파트 레벨 - 모든 값 동일 (초록색)
-        self.grid_tree.tag_configure("part_clean", 
-                                    font=("Arial", 10, "bold"), 
-                                    background="#FAFAFA", 
-                                    foreground="#2E7D32")
-        
-        # 파트 레벨 - 차이 있음 (빨간색 강조)
-        self.grid_tree.tag_configure("part_diff", 
-                                    font=("Arial", 10, "bold"), 
-                                    background="#FAFAFA", 
-                                    foreground="#D32F2F")
-        
 
-        
+        # 모듈 레벨 - 차이 있음 (빨간색 강조)
+        self.grid_tree.tag_configure("module_diff",
+                                    font=("Arial", 11, "bold"),
+                                    background="#F5F5F5",
+                                    foreground="#D32F2F")
+
+        # 파트 레벨 - 중간 크기, 볼드
+        self.grid_tree.tag_configure("part",
+                                    font=("Arial", 10, "bold"),
+                                    background="#FAFAFA",
+                                    foreground="#424242")
+
+        # 파트 레벨 - 모든 값 동일 (초록색)
+        self.grid_tree.tag_configure("part_clean",
+                                    font=("Arial", 10, "bold"),
+                                    background="#FAFAFA",
+                                    foreground="#2E7D32")
+
+        # 파트 레벨 - 차이 있음 (빨간색 강조)
+        self.grid_tree.tag_configure("part_diff",
+                                    font=("Arial", 10, "bold"),
+                                    background="#FAFAFA",
+                                    foreground="#D32F2F")
+
         # 파라미터 레벨 - 기본 크기
-        self.grid_tree.tag_configure("parameter_same", 
-                                    font=("Arial", 9), 
-                                    background="white", 
+        self.grid_tree.tag_configure("parameter_same",
+                                    font=("Arial", 9),
+                                    background="white",
                                     foreground="black")
-        
+
         # 차이점이 있는 파라미터 - 전체 목록 탭과 동일한 색상
-        self.grid_tree.tag_configure("parameter_different", 
-                                    font=("Arial", 9), 
-                                    background="#FFECB3", 
+        self.grid_tree.tag_configure("parameter_different",
+                                    font=("Arial", 9),
+                                    background="#FFECB3",
                                     foreground="#E65100")
-        
-        # 계층 구조 데이터 구성
+
+    def _build_grid_hierarchy_data(self, columns):
+        """계층 구조 데이터 구성 (Grid View)
+
+        Returns:
+            tuple: (modules_data, total_params, diff_count)
+        """
         modules_data = {}
         total_params = 0
         diff_count = 0
-        
+
         grouped = self.merged_df.groupby(["Module", "Part", "ItemName"])
-        
+
         for (module, part, item_name), group in grouped:
             if module not in modules_data:
                 modules_data[module] = {}
             if part not in modules_data[module]:
                 modules_data[module][part] = {}
-            
+
             # 각 파일별 값 수집
             values = []
             for model in self.file_names:
@@ -1527,11 +1505,11 @@ class DBManager:
                     values.append(str(model_data["ItemValue"].iloc[0]))
                 else:
                     values.append("-")
-            
+
             # 값 차이 확인 (빈 값 제외)
             non_empty_values = [v for v in values if v != "-"]
             has_difference = len(set(non_empty_values)) > 1 if len(non_empty_values) > 1 else False
-            
+
             modules_data[module][part][item_name] = {
                 "values": values,
                 "has_difference": has_difference
@@ -1539,35 +1517,39 @@ class DBManager:
             total_params += 1
             if has_difference:
                 diff_count += 1
-        
+
+        return modules_data, total_params, diff_count
+
+    def _populate_grid_tree(self, modules_data, columns, diff_count):
+        """트리뷰에 계층 구조로 데이터 추가 및 통계 업데이트"""
         # 트리뷰에 계층 구조로 데이터 추가
         for module_name in sorted(modules_data.keys()):
             # 모듈 레벨 통계 계산
             module_total = sum(len(modules_data[module_name][part]) for part in modules_data[module_name])
-            module_diff = sum(1 for part in modules_data[module_name] 
-                            for item in modules_data[module_name][part] 
+            module_diff = sum(1 for part in modules_data[module_name]
+                            for item in modules_data[module_name][part]
                             if modules_data[module_name][part][item]["has_difference"])
-            
+
             # 모듈 표시 - 파란색 통일
             if module_diff == 0:
                 module_text = f"📁 {module_name} ({module_total})"
             else:
                 module_text = f"📁 {module_name} ({module_total}) Diff: {module_diff}"
             module_tag = "module"
-            
+
             # 모듈 노드 추가
-            module_node = self.grid_tree.insert("", "end", 
-                                               text=module_text, 
-                                               values=[""] * len(columns), 
+            module_node = self.grid_tree.insert("", "end",
+                                               text=module_text,
+                                               values=[""] * len(columns),
                                                open=True,
                                                tags=(module_tag,))
-            
+
             for part_name in sorted(modules_data[module_name].keys()):
                 # 파트 레벨 통계 계산
                 part_total = len(modules_data[module_name][part_name])
-                part_diff = sum(1 for item in modules_data[module_name][part_name] 
+                part_diff = sum(1 for item in modules_data[module_name][part_name]
                               if modules_data[module_name][part_name][item]["has_difference"])
-                
+
                 # 파트 표시 - 차이가 없으면 초록색, 있으면 회색
                 if part_diff == 0:
                     part_text = f"📂 {part_name} ({part_total})"
@@ -1575,39 +1557,77 @@ class DBManager:
                 else:
                     part_text = f"📂 {part_name} ({part_total}) Diff: {part_diff}"
                     part_tag = "part_diff"
-                
+
                 # 파트 노드 추가
-                part_node = self.grid_tree.insert(module_node, "end", 
-                                                 text=part_text, 
-                                                 values=[""] * len(columns), 
+                part_node = self.grid_tree.insert(module_node, "end",
+                                                 text=part_text,
+                                                 values=[""] * len(columns),
                                                  open=True,
                                                  tags=(part_tag,))
-                
+
                 for item_name in sorted(modules_data[module_name][part_name].keys()):
                     # 파라미터 노드 추가 - 기본 크기, 차이점에 따라 색상 구분
                     item_data = modules_data[module_name][part_name][item_name]
                     values = item_data["values"]
                     has_difference = item_data["has_difference"]
-                    
+
                     # 태그 선택
                     tag = "parameter_different" if has_difference else "parameter_same"
-                    
-                    self.grid_tree.insert(part_node, "end", 
-                                        text=item_name, 
-                                        values=values, 
+
+                    self.grid_tree.insert(part_node, "end",
+                                        text=item_name,
+                                        values=values,
                                         tags=(tag,))
-        
+
         # 통계 정보 업데이트
+        total_params = sum(len(parts_data)
+                          for module_data in modules_data.values()
+                          for parts_data in module_data.values())
+
         if hasattr(self, 'grid_total_label'):
             self.grid_total_label.config(text=f"총 파라미터: {total_params}")
             self.grid_modules_label.config(text=f"모듈 수: {len(modules_data)}")
-            
+
             total_parts = sum(len(parts) for parts in modules_data.values())
             self.grid_parts_label.config(text=f"파트 수: {total_parts}")
-            
+
             # 차이점 개수도 표시
             if hasattr(self, 'grid_diff_label'):
                 self.grid_diff_label.config(text=f"값이 다른 항목: {diff_count}")
+
+    def update_grid_view(self):
+        """격자뷰 데이터 업데이트 - 트리뷰 구조 (리팩토링됨)"""
+        if not hasattr(self, 'grid_tree'):
+            return
+
+        # 기존 데이터 삭제
+        self._clear_treeview(self.grid_tree)
+
+        if self.merged_df is None or self.merged_df.empty:
+            # 통계 정보 초기화
+            if hasattr(self, 'grid_total_label'):
+                self.grid_total_label.config(text="총 파라미터: 0개")
+                self.grid_modules_label.config(text="모듈 수: 0개")
+                self.grid_parts_label.config(text="파트 수: 0개")
+            return
+
+        # 동적 컬럼 업데이트
+        columns = tuple(self.file_names) if self.file_names else ("값",)
+        self.grid_tree["columns"] = columns
+
+        # 컬럼 헤딩 업데이트
+        for col in columns:
+            self.grid_tree.heading(col, text=col, anchor="center")
+            self.grid_tree.column(col, width=150, anchor="center")
+
+        # 계층별 스타일 태그 설정
+        self._configure_grid_view_tags()
+
+        # 계층 구조 데이터 구성
+        modules_data, total_params, diff_count = self._build_grid_hierarchy_data(columns)
+
+        # 트리뷰에 계층 구조로 데이터 추가 및 통계 업데이트
+        self._populate_grid_tree(modules_data, columns, diff_count)
 
     def create_comparison_tab(self):
         comparison_frame = ttk.Frame(self.comparison_notebook)
@@ -4654,87 +4674,59 @@ class DBManager:
         return duplicate_analysis
 
 
-    def show_duplicate_analysis_dialog(self, duplicate_analysis):
-        """
-        중복 분석 결과를 보여주는 다이얼로그를 표시합니다.
-        
-        Args:
-            duplicate_analysis: get_duplicate_analysis 결과
-        """
-        dlg = tk.Toplevel(self.window)
-        dlg.title("🔍 중복 검사 결과")
-        dlg.geometry("900x700")
-        dlg.transient(self.window)
-        dlg.grab_set()
-        
-        # 요약 정보 표시
-        summary_frame = ttk.LabelFrame(dlg, text="📊 요약", padding=10)
-        summary_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        summary = duplicate_analysis['summary']
-        summary_text = (f"선택된 항목: {summary['total_selected']}개 | "
-                       f"정확 중복: {summary['exact_duplicates']}개 | "
-                       f"잠재 중복: {summary['potential_duplicates']}개 | "
-                       f"새 파라미터: {summary['new_parameters']}개 | "
-                       f"값 충돌: {summary['value_conflicts']}개")
-        
-        ttk.Label(summary_frame, text=summary_text, font=("", 10, "bold")).pack()
-        
-        # 탭 구성
-        notebook = ttk.Notebook(dlg)
-        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
-        
-        # 1. 기존 DB 중복 탭
+    def _create_existing_duplicates_tab(self, notebook, duplicate_analysis):
+        """기존 DB 중복 탭 생성"""
         existing_frame = ttk.Frame(notebook)
         notebook.add(existing_frame, text=f"🔴 기존 DB 중복 ({len(duplicate_analysis['existing_in_db'])}개)")
-        
+
         if duplicate_analysis['existing_in_db']:
             existing_text = tk.Text(existing_frame, wrap=tk.WORD, font=("Consolas", 9))
             existing_scroll = ttk.Scrollbar(existing_frame, orient="vertical", command=existing_text.yview)
             existing_text.configure(yscrollcommand=existing_scroll.set)
-            
+
             existing_scroll.pack(side=tk.RIGHT, fill=tk.Y)
             existing_text.pack(fill=tk.BOTH, expand=True)
-            
+
             existing_text.insert(tk.END, "⚠️ 다음 파라미터들이 이미 Default DB에 존재합니다:\n\n")
-            
+
             for item in duplicate_analysis['existing_in_db']:
                 status = "✅ 값 일치" if item['value_match'] else "❌ 값 불일치"
                 status_color = "✅" if item['value_match'] else "🔥"
-                
+
                 existing_text.insert(tk.END, f"{status_color} {item['param_name']}\n")
                 existing_text.insert(tk.END, f"   현재 값: {item['current_value']}\n")
                 existing_text.insert(tk.END, f"   DB 저장값: {item['existing_value']}\n")
                 existing_text.insert(tk.END, f"   장비 유형: {item['equipment_type']}\n")
                 existing_text.insert(tk.END, f"   상태: {status}\n")
-                
+
                 if not item['value_match']:
                     existing_text.insert(tk.END, f"   ⚠️ 주의: 값이 다릅니다! 기존 값을 덮어쓸지 검토 필요\n")
                 existing_text.insert(tk.END, "\n")
         else:
-            ttk.Label(existing_frame, text="✅ 기존 DB와 정확히 일치하는 중복 항목이 없습니다.", 
+            ttk.Label(existing_frame, text="✅ 기존 DB와 정확히 일치하는 중복 항목이 없습니다.",
                      font=("", 12)).pack(expand=True)
-        
-        # 2. 잠재적 중복 탭
+
+    def _create_potential_duplicates_tab(self, notebook, duplicate_analysis):
+        """잠재적 중복 탭 생성"""
         potential_frame = ttk.Frame(notebook)
         notebook.add(potential_frame, text=f"🟡 잠재적 중복 ({len(duplicate_analysis['potential_duplicates'])}개)")
-        
+
         if duplicate_analysis['potential_duplicates']:
             potential_text = tk.Text(potential_frame, wrap=tk.WORD, font=("Consolas", 9))
             potential_scroll = ttk.Scrollbar(potential_frame, orient="vertical", command=potential_text.yview)
             potential_text.configure(yscrollcommand=potential_scroll.set)
-            
+
             potential_scroll.pack(side=tk.RIGHT, fill=tk.Y)
             potential_text.pack(fill=tk.BOTH, expand=True)
-            
+
             potential_text.insert(tk.END, "🔍 유사한 이름의 파라미터들이 발견되었습니다:\n")
             potential_text.insert(tk.END, "이들은 실제로는 같은 파라미터일 가능성이 있습니다.\n\n")
-            
+
             for item in duplicate_analysis['potential_duplicates']:
                 potential_text.insert(tk.END, f"🟡 새 파라미터: {item['param_name']}\n")
                 potential_text.insert(tk.END, f"   값: {item['current_value']}\n")
                 potential_text.insert(tk.END, f"   유사한 기존 파라미터들:\n")
-                
+
                 for similar in item['similar_params']:
                     similarity_bar = "█" * int(similar['similarity'] * 10)
                     potential_text.insert(tk.END, f"      • {similar['existing_param']}\n")
@@ -4743,24 +4735,25 @@ class DBManager:
                     potential_text.insert(tk.END, f"        장비 유형: {similar['equipment_type']}\n")
                 potential_text.insert(tk.END, "\n")
         else:
-            ttk.Label(potential_frame, text="✅ 유사한 이름의 잠재적 중복 항목이 없습니다.", 
+            ttk.Label(potential_frame, text="✅ 유사한 이름의 잠재적 중복 항목이 없습니다.",
                      font=("", 12)).pack(expand=True)
-        
-        # 3. 새로운 파라미터 탭
+
+    def _create_new_parameters_tab(self, notebook, duplicate_analysis):
+        """새로운 파라미터 탭 생성"""
         new_frame = ttk.Frame(notebook)
         notebook.add(new_frame, text=f"🟢 새 파라미터 ({len(duplicate_analysis['new_parameters'])}개)")
-        
+
         if duplicate_analysis['new_parameters']:
             new_text = tk.Text(new_frame, wrap=tk.WORD, font=("Consolas", 9))
             new_scroll = ttk.Scrollbar(new_frame, orient="vertical", command=new_text.yview)
             new_text.configure(yscrollcommand=new_scroll.set)
-            
+
             new_scroll.pack(side=tk.RIGHT, fill=tk.Y)
             new_text.pack(fill=tk.BOTH, expand=True)
-            
+
             new_text.insert(tk.END, "✨ 완전히 새로운 파라미터들입니다:\n")
             new_text.insert(tk.END, "이들은 안전하게 Default DB에 추가할 수 있습니다.\n\n")
-            
+
             for item in duplicate_analysis['new_parameters']:
                 new_text.insert(tk.END, f"✅ {item['param_name']}\n")
                 new_text.insert(tk.END, f"   값: {item['current_value']}\n")
@@ -4768,23 +4761,24 @@ class DBManager:
                 new_text.insert(tk.END, f"   파트: {item['part']}\n")
                 new_text.insert(tk.END, f"   항목명: {item['item_name']}\n\n")
         else:
-            ttk.Label(new_frame, text="ℹ️ 새로운 파라미터가 없습니다.", 
+            ttk.Label(new_frame, text="ℹ️ 새로운 파라미터가 없습니다.",
                      font=("", 12)).pack(expand=True)
-        
-        # 4. 권장사항 탭 (새로 추가)
+
+    def _create_recommendations_tab(self, notebook, summary):
+        """권장사항 탭 생성"""
         recommend_frame = ttk.Frame(notebook)
         notebook.add(recommend_frame, text="💡 권장사항")
-        
+
         recommend_text = tk.Text(recommend_frame, wrap=tk.WORD, font=("", 10))
         recommend_scroll = ttk.Scrollbar(recommend_frame, orient="vertical", command=recommend_text.yview)
         recommend_text.configure(yscrollcommand=recommend_scroll.set)
-        
+
         recommend_scroll.pack(side=tk.RIGHT, fill=tk.Y)
         recommend_text.pack(fill=tk.BOTH, expand=True)
-        
+
         # 권장사항 생성
         recommend_text.insert(tk.END, "📋 중복 검사 기반 권장사항\n\n")
-        
+
         if summary['exact_duplicates'] > 0:
             recommend_text.insert(tk.END, f"🔴 정확한 중복 항목 ({summary['exact_duplicates']}개):\n")
             if summary['value_conflicts'] > 0:
@@ -4794,34 +4788,69 @@ class DBManager:
             else:
                 recommend_text.insert(tk.END, f"   • 모든 값이 일치하므로 안전하게 진행 가능합니다\n")
             recommend_text.insert(tk.END, "\n")
-        
+
         if summary['potential_duplicates'] > 0:
             recommend_text.insert(tk.END, f"🟡 잠재적 중복 항목 ({summary['potential_duplicates']}개):\n")
             recommend_text.insert(tk.END, f"   • 파라미터 이름을 검토하여 실제 중복인지 확인하세요\n")
             recommend_text.insert(tk.END, f"   • 동일한 파라미터라면 기존 이름으로 통일을 권장합니다\n")
             recommend_text.insert(tk.END, f"   • 다른 파라미터라면 그대로 추가해도 됩니다\n\n")
-        
+
         if summary['new_parameters'] > 0:
             recommend_text.insert(tk.END, f"🟢 새로운 파라미터 ({summary['new_parameters']}개):\n")
             recommend_text.insert(tk.END, f"   • 안전하게 Default DB에 추가할 수 있습니다\n")
             recommend_text.insert(tk.END, f"   • 통계 기반 분석으로 신뢰도 높은 기준값을 설정하세요\n\n")
-        
+
         # 전체 권장사항
         recommend_text.insert(tk.END, "💡 전체 권장사항:\n")
         recommend_text.insert(tk.END, "1. 통계 기반 분석을 활용하여 중복도가 높은 값을 기준값으로 선택\n")
         recommend_text.insert(tk.END, "2. 신뢰도 임계값을 적절히 설정 (50% 이상 권장)\n")
         recommend_text.insert(tk.END, "3. 값 충돌이 있는 경우 수동으로 검토 후 결정\n")
         recommend_text.insert(tk.END, "4. 잠재적 중복은 파라미터 명명 규칙을 통일하여 해결\n")
-        
+
+    def show_duplicate_analysis_dialog(self, duplicate_analysis):
+        """중복 분석 결과를 보여주는 다이얼로그 (리팩토링됨)
+
+        Args:
+            duplicate_analysis: get_duplicate_analysis 결과
+        """
+        dlg = tk.Toplevel(self.window)
+        dlg.title("🔍 중복 검사 결과")
+        dlg.geometry("900x700")
+        dlg.transient(self.window)
+        dlg.grab_set()
+
+        # 요약 정보 표시
+        summary_frame = ttk.LabelFrame(dlg, text="📊 요약", padding=10)
+        summary_frame.pack(fill=tk.X, padx=10, pady=5)
+
+        summary = duplicate_analysis['summary']
+        summary_text = (f"선택된 항목: {summary['total_selected']}개 | "
+                       f"정확 중복: {summary['exact_duplicates']}개 | "
+                       f"잠재 중복: {summary['potential_duplicates']}개 | "
+                       f"새 파라미터: {summary['new_parameters']}개 | "
+                       f"값 충돌: {summary['value_conflicts']}개")
+
+        ttk.Label(summary_frame, text=summary_text, font=("", 10, "bold")).pack()
+
+        # 탭 구성
+        notebook = ttk.Notebook(dlg)
+        notebook.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+
+        # 각 탭 생성
+        self._create_existing_duplicates_tab(notebook, duplicate_analysis)
+        self._create_potential_duplicates_tab(notebook, duplicate_analysis)
+        self._create_new_parameters_tab(notebook, duplicate_analysis)
+        self._create_recommendations_tab(notebook, summary)
+
         # 버튼 프레임
         button_frame = ttk.Frame(dlg)
         button_frame.pack(fill=tk.X, padx=10, pady=10)
-        
+
         ttk.Button(button_frame, text="닫기", command=dlg.destroy).pack(side=tk.RIGHT, padx=5)
-        
+
         # 중복 해결 버튼 (추후 기능 확장용)
         if summary['potential_duplicates'] > 0 or summary['value_conflicts'] > 0:
-            ttk.Button(button_frame, text="중복 해결 마법사", 
+            ttk.Button(button_frame, text="중복 해결 마법사",
                       command=lambda: self.show_duplicate_resolution_wizard(duplicate_analysis)).pack(side=tk.LEFT, padx=5)
 
     def show_duplicate_resolution_wizard(self, duplicate_analysis):
