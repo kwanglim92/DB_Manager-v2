@@ -5412,9 +5412,30 @@ class DBManager:
             if not confirm:
                 return
 
-            # TODO: ConfigurationService.convert_to_type_common() 구현 필요
-            messagebox.showinfo("구현 예정", "Convert to Type Common 기능은 추후 구현 예정입니다.\n(Phase 1.5 Week 2 Day 4 완료 후)")
-            self.update_log("📌 Convert to Type Common 기능 호출됨 (미구현)")
+            # ConfigurationService를 사용하여 Type Common으로 변환
+            db_ids = self.get_selected_db_ids()
+            if not db_ids:
+                messagebox.showwarning("알림", "유효한 파라미터 ID를 찾을 수 없습니다.")
+                return
+
+            # Equipment Type ID 가져오기
+            current_type_id = self.get_current_equipment_type_id()
+            if not current_type_id:
+                messagebox.showerror("오류", "Equipment Type을 확인할 수 없습니다.")
+                return
+
+            # ConfigurationService 호출
+            config_service = self.service_factory.get_configuration_service()
+            success = config_service.convert_to_type_common(db_ids, current_type_id)
+
+            if success:
+                messagebox.showinfo("완료", f"{len(db_ids)}개 파라미터를 Type Common으로 전환했습니다.")
+                self.update_log(f"✅ {len(db_ids)}개 파라미터 → Type Common 전환 성공")
+                # Default DB 표시 새로고침
+                self.update_default_db_display()
+            else:
+                messagebox.showerror("오류", "Type Common 전환에 실패했습니다.")
+                self.update_log("❌ Type Common 전환 실패")
 
         except Exception as e:
             error_msg = f"Type Common 전환 오류: {e}"
@@ -5461,9 +5482,24 @@ class DBManager:
             if not confirm:
                 return
 
-            # TODO: ConfigurationService.convert_to_configuration_specific() 구현 필요
-            messagebox.showinfo("구현 예정", "Convert to Configuration-specific 기능은 추후 구현 예정입니다.\n(Phase 1.5 Week 2 Day 4 완료 후)")
-            self.update_log("📌 Convert to Configuration-specific 기능 호출됨 (미구현)")
+            # ConfigurationService를 사용하여 Configuration-specific으로 변환
+            db_ids = self.get_selected_db_ids()
+            if not db_ids:
+                messagebox.showwarning("알림", "유효한 파라미터 ID를 찾을 수 없습니다.")
+                return
+
+            # ConfigurationService 호출
+            config_service = self.service_factory.get_configuration_service()
+            success = config_service.convert_to_configuration_specific(db_ids, self.current_selected_config_id)
+
+            if success:
+                messagebox.showinfo("완료", f"{len(db_ids)}개 파라미터를 Configuration-specific으로 전환했습니다.\nConfiguration: {config_name}")
+                self.update_log(f"✅ {len(db_ids)}개 파라미터 → Configuration-specific 전환 성공 (config_id={self.current_selected_config_id})")
+                # Default DB 표시 새로고침
+                self.update_default_db_display()
+            else:
+                messagebox.showerror("오류", "Configuration-specific 전환에 실패했습니다.")
+                self.update_log("❌ Configuration-specific 전환 실패")
 
         except Exception as e:
             error_msg = f"Configuration-specific 전환 오류: {e}"
@@ -5498,6 +5534,27 @@ class DBManager:
                 except (ValueError, IndexError):
                     continue
         return None
+
+    def get_current_equipment_type_id(self):
+        """현재 선택된 Equipment Type의 ID를 반환합니다."""
+        try:
+            if not hasattr(self, 'equipment_type_combo'):
+                return None
+
+            selected_type = self.equipment_type_combo.get()
+            if not selected_type:
+                return None
+
+            # DB에서 Equipment Type ID 조회
+            with self.db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+                cursor.execute("SELECT id FROM Equipment_Types WHERE type_name = ?", (selected_type,))
+                row = cursor.fetchone()
+                return row[0] if row else None
+
+        except Exception as e:
+            logging.error(f"Failed to get current equipment type ID: {e}")
+            return None
 
     # ========== 🔍 새로운 Parameter 필터 기능 메서드들 ==========
 

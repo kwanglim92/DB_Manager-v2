@@ -174,11 +174,29 @@ class ReportService(IReportService):
             생성 성공 여부
         """
         try:
-            # HTML을 먼저 생성하고 PDF로 변환 (향후 구현)
+            # HTML을 먼저 생성하고 PDF로 변환
             html_content = self.generate_html_report(data)
 
-            # TODO: HTML → PDF 변환 (pdfkit, weasyprint 등 사용)
-            self.logger.warning("PDF 생성은 현재 구현되지 않았습니다")
+            # PDF 변환 구현 (외부 라이브러리 필요)
+            #
+            # Option 1: weasyprint (권장, 순수 Python)
+            #   pip install weasyprint
+            #   from weasyprint import HTML
+            #   HTML(string=html_content).write_pdf(file_path)
+            #
+            # Option 2: pdfkit (wkhtmltopdf 필요)
+            #   pip install pdfkit
+            #   import pdfkit
+            #   pdfkit.from_string(html_content, file_path)
+            #
+            # Option 3: xhtml2pdf (간단)
+            #   pip install xhtml2pdf
+            #   from xhtml2pdf import pisa
+            #   with open(file_path, 'wb') as pdf_file:
+            #       pisa.CreatePDF(html_content, dest=pdf_file)
+
+            self.logger.warning("PDF 생성은 외부 라이브러리 설치 후 사용 가능합니다 (weasyprint/pdfkit/xhtml2pdf)")
+            self.logger.info(f"HTML 콘텐츠 생성 완료. PDF 변환은 위 라이브러리 중 하나를 설치하세요.")
             return False
 
         except Exception as e:

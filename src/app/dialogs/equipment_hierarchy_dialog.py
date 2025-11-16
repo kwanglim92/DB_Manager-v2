@@ -315,8 +315,20 @@ class EquipmentHierarchyDialog:
                 return
 
             model_names = [m.model_name for m in models]
-            # TODO: Combobox dialog로 개선
-            model_id = models[0].id  # 임시: 첫 번째 모델 선택
+            # Combobox dialog로 Model 선택
+            selected_model = self._show_selection_dialog(
+                "Select Model",
+                "Model을 선택하세요:",
+                model_names
+            )
+
+            if not selected_model:
+                return
+
+            model_id = next((m.id for m in models if m.model_name == selected_model), None)
+            if not model_id:
+                messagebox.showerror("오류", "선택한 Model을 찾을 수 없습니다.")
+                return
 
         type_name = simpledialog.askstring(
             "Add Equipment Type",
@@ -407,7 +419,8 @@ class EquipmentHierarchyDialog:
 
     def _edit_model(self, model_id):
         """Model 수정"""
-        # TODO: 상세 Edit Dialog 구현
+        # 상세 Edit Dialog 구현 (향후 개선: custom dialog with description, display_order)
+        # 현재: simpledialog로 기본 구현
         model = self.category_service.get_equipment_model_by_id(model_id)
         if not model:
             messagebox.showerror("오류", "Model을 찾을 수 없습니다.")
@@ -435,7 +448,8 @@ class EquipmentHierarchyDialog:
 
     def _edit_type(self, type_id):
         """Type 수정"""
-        # TODO: 상세 Edit Dialog 구현
+        # 상세 Edit Dialog 구현 (향후 개선: custom dialog with description, is_default)
+        # 현재: simpledialog로 기본 구현
         eq_type = self.category_service.get_equipment_type_by_id(type_id)
         if not eq_type:
             messagebox.showerror("오류", "Type을 찾을 수 없습니다.")
@@ -565,3 +579,57 @@ class EquipmentHierarchyDialog:
             messagebox.showinfo("Details", details)
         except Exception as e:
             messagebox.showerror("오류", f"상세 정보 조회 실패:\n{str(e)}")
+
+    def _show_selection_dialog(self, title, message, options):
+        """
+        Combobox를 사용한 선택 다이얼로그
+
+        Args:
+            title: 다이얼로그 제목
+            message: 안내 메시지
+            options: 선택 옵션 리스트
+
+        Returns:
+            선택된 항목 (취소 시 None)
+        """
+        dialog = tk.Toplevel(self.dialog)
+        dialog.title(title)
+        dialog.geometry("350x150")
+        dialog.transient(self.dialog)
+        dialog.grab_set()
+
+        result = [None]  # Mutable container for result
+
+        # Message
+        ttk.Label(dialog, text=message).pack(pady=10)
+
+        # Combobox
+        selected_var = tk.StringVar()
+        combobox = ttk.Combobox(dialog, textvariable=selected_var, values=options, state='readonly', width=30)
+        if options:
+            combobox.current(0)
+        combobox.pack(pady=10)
+
+        # Buttons
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(pady=10)
+
+        def on_ok():
+            result[0] = selected_var.get()
+            dialog.destroy()
+
+        def on_cancel():
+            result[0] = None
+            dialog.destroy()
+
+        ttk.Button(button_frame, text="OK", command=on_ok).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="Cancel", command=on_cancel).pack(side=tk.LEFT, padx=5)
+
+        # Center dialog
+        dialog.update_idletasks()
+        x = (dialog.winfo_screenwidth() // 2) - (dialog.winfo_width() // 2)
+        y = (dialog.winfo_screenheight() // 2) - (dialog.winfo_height() // 2)
+        dialog.geometry(f"+{x}+{y}")
+
+        dialog.wait_window()
+        return result[0]

@@ -862,3 +862,147 @@ class ConfigurationService(IConfigurationService):
             """, (search_pattern, search_pattern, search_pattern))
 
             return [self._row_to_default_value(row) for row in cursor.fetchall()]
+
+    def convert_to_type_common(self, parameter_ids: List[int], type_id: int) -> bool:
+        """
+        Configuration-specific 파라미터를 Type Common으로 변환
+
+        Args:
+            parameter_ids: 변환할 파라미터 ID 리스트
+            type_id: Equipment Type ID
+
+        Returns:
+            bool: 변환 성공 여부
+        """
+        try:
+            with self._db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+
+                for param_id in parameter_ids:
+                    # 1. 파라미터 정보 조회
+                    cursor.execute("""
+                        SELECT parameter_name, default_value, notes
+                        FROM Default_DB_Values
+                        WHERE id = ?
+                    """, (param_id,))
+
+                    row = cursor.fetchone()
+                    if not row:
+                        self._logger.warning(f"Parameter ID {param_id} not found")
+                        continue
+
+                    param_name, default_value, notes = row
+
+                    # 2. Type Common 파라미터가 이미 존재하는지 확인
+                    cursor.execute("""
+                        SELECT id FROM Default_DB_Values
+                        WHERE configuration_id IN (
+                            SELECT id FROM Equipment_Configurations
+                            WHERE type_id = ?
+                        )
+                        AND parameter_name = ?
+                        AND is_type_common = 1
+                    """, (type_id, param_name))
+
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        # 이미 Type Common 파라미터가 존재하면 현재 파라미터만 삭제
+                        cursor.execute("DELETE FROM Default_DB_Values WHERE id = ?", (param_id,))
+                        self._logger.info(f"Removed duplicate Configuration-specific parameter: {param_name}")
+                    else:
+                        # Type Common으로 변환 (is_type_common = 1)
+                        cursor.execute("""
+                            UPDATE Default_DB_Values
+                            SET is_type_common = 1
+                            WHERE id = ?
+                        """, (param_id,))
+
+                        self._logger.info(f"Converted to Type Common: {param_name}")
+
+                conn.commit()
+                self._invalidate_cache()
+
+                self._logging.log_service_action(
+                    "ConfigurationService",
+                    f"Converted {len(parameter_ids)} parameters to Type Common"
+                )
+
+                return True
+
+        except Exception as e:
+            self._logger.error(f"Failed to convert to Type Common: {e}")
+            return False
+
+    def convert_to_configuration_specific(self, parameter_ids: List[int], configuration_id: int) -> bool:
+        """
+        Type Common 파라미터를 Configuration-specific으로 변환
+
+        Args:
+            parameter_ids: 변환할 파라미터 ID 리스트
+            configuration_id: 대상 Configuration ID
+
+        Returns:
+            bool: 변환 성공 여부
+        """
+        try:
+            with self._db_schema.get_connection() as conn:
+                cursor = conn.cursor()
+
+                for param_id in parameter_ids:
+                    # 1. 파라미터 정보 조회
+                    cursor.execute("""
+                        SELECT parameter_name, default_value, notes, is_type_common
+                        FROM Default_DB_Values
+                        WHERE id = ?
+                    """, (param_id,))
+
+                    row = cursor.fetchone()
+                    if not row:
+                        self._logger.warning(f"Parameter ID {param_id} not found")
+                        continue
+
+                    param_name, default_value, notes, is_type_common = row
+
+                    if not is_type_common:
+                        self._logger.warning(f"Parameter {param_name} is not Type Common")
+                        continue
+
+                    # 2. Configuration-specific 파라미터가 이미 존재하는지 확인
+                    cursor.execute("""
+                        SELECT id FROM Default_DB_Values
+                        WHERE configuration_id = ?
+                        AND parameter_name = ?
+                        AND is_type_common = 0
+                    """, (configuration_id, param_name))
+
+                    existing = cursor.fetchone()
+
+                    if existing:
+                        self._logger.warning(f"Configuration-specific parameter already exists: {param_name}")
+                        continue
+
+                    # 3. 새 Configuration-specific 파라미터 생성
+                    cursor.execute("""
+                        INSERT INTO Default_DB_Values
+                        (configuration_id, parameter_name, default_value, is_type_common, notes)
+                        VALUES (?, ?, ?, 0, ?)
+                    """, (configuration_id, param_name, default_value, notes))
+
+                    self._logger.info(f"Created Configuration-specific parameter: {param_name}")
+
+                    # 4. 기존 Type Common 파라미터는 유지 (다른 Configuration에서도 사용 가능)
+
+                conn.commit()
+                self._invalidate_cache()
+
+                self._logging.log_service_action(
+                    "ConfigurationService",
+                    f"Converted {len(parameter_ids)} parameters to Configuration-specific (config_id={configuration_id})"
+                )
+
+                return True
+
+        except Exception as e:
+            self._logger.error(f"Failed to convert to Configuration-specific: {e}")
+            return False

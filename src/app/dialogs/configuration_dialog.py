@@ -288,14 +288,10 @@ class ConfigurationDialog:
         self.port_count_var.set(self.config.port_count)
         self.wafer_count_var.set(self.config.wafer_count)
 
-        # Port Type/Wafer Size는 역추론 (간단한 로직)
-        # TODO: 더 정교한 매핑 필요
-        if self.config.port_count == 1:
-            self.port_type_var.set("Single Port")
-        elif self.config.port_count == 2:
-            self.port_type_var.set("Double Port")
-        else:
-            self.port_type_var.set("Multi Port")
+        # Port Type/Wafer Size 역추론 (정교한 매핑)
+        # custom_options JSON에서 실제 타입 정보를 가져오되, 없으면 count 기반 추론
+        port_type = self._infer_port_type(self.config.port_count, self.config.custom_options)
+        self.port_type_var.set(port_type)
 
         # Wafer Size (간단한 매핑)
         if self.config.wafer_count == 1:
@@ -396,6 +392,35 @@ class ConfigurationDialog:
             messagebox.showerror("Validation Error", str(e))
         except Exception as e:
             messagebox.showerror("Error", f"Failed to save Configuration:\n{str(e)}")
+
+    def _infer_port_type(self, port_count, custom_options):
+        """Port count와 custom_options로부터 Port Type 추론"""
+        try:
+            # custom_options JSON에서 port_type 정보 확인
+            if custom_options:
+                import json
+                options = json.loads(custom_options) if isinstance(custom_options, str) else custom_options
+                if 'port_type' in options:
+                    return options['port_type']
+
+            # Count 기반 추론
+            if port_count == 1:
+                return "Single Port"
+            elif port_count == 2:
+                return "Double Port"
+            elif port_count >= 3:
+                return "Multi Port"
+            else:
+                return "Custom"
+
+        except Exception:
+            # JSON 파싱 실패 시 기본 추론
+            if port_count == 1:
+                return "Single Port"
+            elif port_count == 2:
+                return "Double Port"
+            else:
+                return "Multi Port"
 
     def get_result(self):
         """생성/수정된 Configuration ID 반환"""

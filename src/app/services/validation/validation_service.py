@@ -216,9 +216,68 @@ class ValidationService(IValidationService):
         issues = []
 
         try:
-            # TODO: 커스텀 규칙 파싱 및 적용 로직 구현
-            # 현재는 기본 구현만 제공
-            self.logger.info(f"커스텀 규칙 {len(rules)}개 적용")
+            # 커스텀 규칙 파싱 및 적용
+            for rule in rules:
+                try:
+                    rule_type = rule.get('type')
+                    column = rule.get('column')
+
+                    if not column or column not in data.columns:
+                        continue
+
+                    if rule_type == 'range':
+                        # Range 검증: min <= value <= max
+                        min_val = rule.get('min')
+                        max_val = rule.get('max')
+
+                        if min_val is not None or max_val is not None:
+                            for idx, value in data[column].items():
+                                try:
+                                    numeric_val = float(value)
+                                    if min_val is not None and numeric_val < min_val:
+                                        issues.append(f"{column}[{idx}]: {value} < {min_val} (최소값)")
+                                    if max_val is not None and numeric_val > max_val:
+                                        issues.append(f"{column}[{idx}]: {value} > {max_val} (최대값)")
+                                except (ValueError, TypeError):
+                                    pass  # 숫자 변환 실패 시 무시
+
+                    elif rule_type == 'regex':
+                        # 정규식 검증
+                        import re
+                        pattern = rule.get('pattern')
+                        if pattern:
+                            regex = re.compile(pattern)
+                            for idx, value in data[column].items():
+                                if value and not regex.match(str(value)):
+                                    issues.append(f"{column}[{idx}]: '{value}'가 패턴 '{pattern}'과 일치하지 않음")
+
+                    elif rule_type == 'enum':
+                        # Enum 검증: 허용된 값 목록
+                        allowed_values = rule.get('values', [])
+                        if allowed_values:
+                            for idx, value in data[column].items():
+                                if value and str(value) not in [str(v) for v in allowed_values]:
+                                    issues.append(f"{column}[{idx}]: '{value}'가 허용된 값 목록에 없음 ({allowed_values})")
+
+                    elif rule_type == 'required':
+                        # 필수 값 검증 (NULL/빈 값 불허)
+                        for idx, value in data[column].items():
+                            if value is None or str(value).strip() == '':
+                                issues.append(f"{column}[{idx}]: 필수 값이 비어있음")
+
+                    elif rule_type == 'unique':
+                        # 유니크 값 검증 (중복 불허)
+                        value_counts = data[column].value_counts()
+                        duplicates = value_counts[value_counts > 1]
+                        if len(duplicates) > 0:
+                            for value, count in duplicates.items():
+                                issues.append(f"{column}: '{value}' 값이 {count}번 중복됨")
+
+                except Exception as e:
+                    self.logger.warning(f"커스텀 규칙 적용 실패 (규칙: {rule}): {e}")
+                    continue
+
+            self.logger.info(f"커스텀 규칙 {len(rules)}개 적용 완료 (이슈 {len(issues)}개 발견)")
 
             execution_time = (datetime.now() - start_time).total_seconds()
             return self._create_result(issues, len(data.columns), execution_time)
