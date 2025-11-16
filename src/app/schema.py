@@ -547,6 +547,44 @@ class DBSchema:
             except sqlite3.IntegrityError:
                 return None
 
+    def log_change_history(self, action, entity_type, entity_name, old_value, new_value, user, conn_override=None):
+        """
+        일반 변경 이력 기록 (레거시 호환용)
+
+        Equipment Types, Default DB Parameters 등의 변경 이력을 기록합니다.
+        내부적으로 Checklist_Audit_Log 테이블을 재사용합니다.
+
+        Args:
+            action (str): 작업 유형 ('add', 'update', 'delete', 'bulk_add')
+            entity_type (str): 엔티티 종류 ('equipment_type', 'parameter' 등)
+            entity_name (str): 엔티티 이름
+            old_value (str): 이전 값 (삭제/수정 시)
+            new_value (str): 새 값 (추가/수정 시)
+            user (str): 작업 수행자
+            conn_override: 외부 연결 객체 (선택사항)
+        """
+        # action 매핑 (소문자 → 대문자)
+        action_map = {
+            'add': 'ADD',
+            'update': 'MODIFY',
+            'delete': 'REMOVE',
+            'bulk_add': 'ADD'
+        }
+
+        mapped_action = action_map.get(action, action.upper())
+
+        # _log_checklist_audit 메서드 활용
+        self._log_checklist_audit(
+            action=mapped_action,
+            target_table=entity_type,
+            target_id=None,  # 일반 이력에서는 ID 불필요
+            old_value=old_value if old_value else None,
+            new_value=new_value if new_value else None,
+            reason=f"{entity_name}",
+            user=user,
+            conn_override=conn_override
+        )
+
     def _log_checklist_audit(self, action, target_table, target_id, old_value, new_value,
                             reason, user, conn_override=None):
         """Check list 변경 이력 기록 (내부 메서드)"""
