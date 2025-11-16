@@ -166,18 +166,20 @@ class DBSchema:
     # ==================== 장비 유형 관리 ====================
     
     def add_equipment_type(self, type_name, description="", conn_override=None):
-        """새 장비 유형 추가"""
-        with self.get_connection(conn_override) as conn:
-            cursor = conn.cursor()
-            try:
-                cursor.execute('''
-                INSERT INTO Equipment_Types (type_name, description)
-                VALUES (?, ?)
-                ''', (type_name, description))
-                conn.commit()
-                return cursor.lastrowid
-            except sqlite3.IntegrityError:
-                return None
+        """
+        새 장비 유형 추가 (Deprecated in Phase 1.5)
+
+        ⚠️ Phase 1.5부터 Equipment_Types는 model_id (필수)가 필요합니다.
+        CategoryService.create_type(model_id, type_name, description)를 사용하세요.
+        """
+        raise NotImplementedError(
+            "add_equipment_type()는 Phase 1.5에서 더 이상 지원되지 않습니다.\n"
+            "model_id가 필수입니다. CategoryService.create_type()를 사용하세요.\n\n"
+            "예시:\n"
+            "  from app.services import ServiceFactory\n"
+            "  category_service = ServiceFactory.get_category_service()\n"
+            "  type_id = category_service.create_type(model_id=1, type_name='AE', description='...')"
+        )
 
     def get_equipment_types(self, conn_override=None):
         """모든 장비 유형 조회"""
