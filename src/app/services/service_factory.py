@@ -20,6 +20,9 @@ from .interfaces.checklist_service_interface import IChecklistService
 from .interfaces.category_service_interface import ICategoryService
 from .interfaces.configuration_service_interface import IConfigurationService
 from .interfaces.shipped_equipment_service_interface import IShippedEquipmentService
+from .interfaces.comparison_service_interface import IComparisonService
+from .interfaces.motherdb_service_interface import IMotherDBService
+from .interfaces.report_service_interface import IReportService
 
 # 구현체들
 from .equipment.equipment_service import EquipmentService
@@ -27,6 +30,12 @@ from .checklist.checklist_service import ChecklistService
 from .category.category_service import CategoryService
 from .configuration.configuration_service import ConfigurationService
 from .shipped_equipment.shipped_equipment_service import ShippedEquipmentService
+from .parameter.parameter_service import ParameterService
+from .validation.validation_service import ValidationService
+from .qc.qc_service import QCService
+from .comparison.comparison_service import ComparisonService
+from .motherdb.motherdb_service import MotherDBService
+from .report.report_service import ReportService
 
 class ServiceFactory:
     """서비스 팩토리 - 서비스 인스턴스 생성 및 관리"""
@@ -100,12 +109,40 @@ class ServiceFactory:
                 self._registry.register_singleton(IShippedEquipmentService, shipped_equipment_service)
 
                 self._logger.info("Shipped Equipment 관리 서비스 등록 완료")
+
+                # P4: 6개 신규 서비스 등록
+                # 1. ParameterService - Default DB 값 CRUD
+                parameter_service = ParameterService(self._db_schema, cache_service)
+                self._registry.register_singleton(IParameterService, parameter_service)
+                self._logger.info("Parameter 관리 서비스 등록 완료")
+
+                # 2. ValidationService - 데이터 검증
+                validation_service = ValidationService(self._db_schema)
+                self._registry.register_singleton(IValidationService, validation_service)
+                self._logger.info("Validation 서비스 등록 완료")
+
+                # 3. QCService - QC 검증
+                qc_service = QCService(self._db_schema)
+                self._registry.register_singleton(IQCService, qc_service)
+                self._logger.info("QC 서비스 등록 완료")
+
+                # 4. MotherDBService - Mother DB 관리
+                motherdb_service = MotherDBService(self._db_schema)
+                self._registry.register_singleton(IMotherDBService, motherdb_service)
+                self._logger.info("MotherDB 관리 서비스 등록 완료")
+
             else:
                 self._logger.warning("DB 스키마가 없어 서비스를 등록할 수 없습니다")
 
-            # TODO: 다른 서비스들도 점진적으로 추가
-            # self._registry.register_singleton(IParameterService, parameter_service)
-            # self._registry.register_singleton(IDataProcessingService, data_service)
+            # 5. ComparisonService - 파일 비교 (DB 스키마 불필요)
+            comparison_service = ComparisonService()
+            self._registry.register_singleton(IComparisonService, comparison_service)
+            self._logger.info("Comparison 서비스 등록 완료")
+
+            # 6. ReportService - 보고서 생성 (DB 스키마 불필요)
+            report_service = ReportService()
+            self._registry.register_singleton(IReportService, report_service)
+            self._logger.info("Report 서비스 등록 완료")
 
         except Exception as e:
             self._logger.error(f"서비스 등록 중 오류 발생: {str(e)}")
@@ -177,6 +214,30 @@ class ServiceFactory:
             return self._registry.get_service(IShippedEquipmentService)
         except ValueError:
             self._logger.warning("Shipped Equipment 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_comparison_service(self) -> Optional[IComparisonService]:
+        """Comparison 서비스 조회 (P4)"""
+        try:
+            return self._registry.get_service(IComparisonService)
+        except ValueError:
+            self._logger.warning("Comparison 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_motherdb_service(self) -> Optional[IMotherDBService]:
+        """MotherDB 서비스 조회 (P4)"""
+        try:
+            return self._registry.get_service(IMotherDBService)
+        except ValueError:
+            self._logger.warning("MotherDB 서비스가 등록되지 않았습니다")
+            return None
+
+    def get_report_service(self) -> Optional[IReportService]:
+        """Report 서비스 조회 (P4)"""
+        try:
+            return self._registry.get_service(IReportService)
+        except ValueError:
+            self._logger.warning("Report 서비스가 등록되지 않았습니다")
             return None
 
     def get_cache_service(self) -> CacheService:
