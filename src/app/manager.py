@@ -34,6 +34,13 @@ except ImportError:
     USE_NEW_SERVICES = False
     SERVICES_AVAILABLE = False
 
+# 🆕 UI 컴포넌트 분리 (중기 계획 Week 1-2)
+try:
+    from app.ui.tabs.comparison_tab import ComparisonTab
+    USE_COMPARISON_TAB = True
+except ImportError:
+    USE_COMPARISON_TAB = False
+
 
 # 첫 번째 DBManager 클래스 제거됨 - 중복 코드 정리
 
@@ -963,10 +970,30 @@ class DBManager:
             traceback.print_exc()
 
     def create_comparison_tabs(self):
-        """비교 관련 탭 생성 - 기본 기능만"""
-        self.create_grid_view_tab()
-        self.create_comparison_tab()
-        self.create_diff_only_tab()
+        """비교 관련 탭 생성 - 기본 기능만
+
+        🆕 Week 1-2 Day 5: ComparisonTab 클래스 사용으로 전환
+        - UI/로직 분리 완료
+        - 기존 코드: create_grid_view_tab(), create_comparison_tab(), create_diff_only_tab()
+        - 신규 코드: ComparisonTab 인스턴스 생성
+        """
+        if USE_COMPARISON_TAB:
+            # 🆕 신규: ComparisonTab 클래스 사용 (중기 계획 Week 1-2)
+            self.comparison_tab = ComparisonTab(self, self.comparison_notebook)
+
+            # 호환성 유지: 기존 속성들을 ComparisonTab에서 참조
+            self.comparison_tree = self.comparison_tab.comparison_tree
+            self.grid_tree = self.comparison_tab.grid_tree
+            self.diff_only_tree = self.comparison_tab.diff_only_tree
+
+            logging.info("ComparisonTab 클래스로 비교 탭 생성 완료")
+        else:
+            # 레거시: 기존 방식 유지 (fallback)
+            self.create_grid_view_tab()
+            self.create_comparison_tab()
+            self.create_diff_only_tab()
+            logging.info("레거시 방식으로 비교 탭 생성 완료")
+
         # 보고서, 간단 비교, 고급 분석은 QC 탭으로 이동
 
     def create_qc_tabs_with_advanced_features(self):
@@ -1167,51 +1194,59 @@ class DBManager:
         self.update_diff_only_view()
 
     def update_diff_only_view(self):
-        """차이점만 보기 탭 업데이트 - 하이라이트 제거"""
-        if not hasattr(self, 'diff_only_tree'):
-            return
-            
-        for item in self.diff_only_tree.get_children():
-            self.diff_only_tree.delete(item)
-        
-        diff_count = 0
-        if self.merged_df is not None:
-            # 컬럼 업데이트
-            columns = ["Module", "Part", "ItemName"] + self.file_names
-            self.diff_only_tree["columns"] = columns
-            
-            for col in columns:
-                self.diff_only_tree.heading(col, text=col)
-                if col in ["Module", "Part", "ItemName"]:
-                    self.diff_only_tree.column(col, width=120)
-                else:
-                    self.diff_only_tree.column(col, width=150)
-            
-            grouped = self.merged_df.groupby(["Module", "Part", "ItemName"])
-            
-            for (module, part, item_name), group in grouped:
-                # 각 파일별 값 추출
-                file_values = {}
-                for model in self.file_names:
-                    model_data = group[group["Model"] == model]
-                    if not model_data.empty:
-                        file_values[model] = str(model_data["ItemValue"].iloc[0])
+        """차이점만 보기 탭 업데이트
+
+        🆕 Week 1-2 Day 5: ComparisonTab으로 위임
+        """
+        if USE_COMPARISON_TAB and hasattr(self, 'comparison_tab'):
+            # 🆕 신규: ComparisonTab 사용
+            self.comparison_tab.update_diff_only_view()
+        else:
+            # 레거시: 기존 로직 유지
+            if not hasattr(self, 'diff_only_tree'):
+                return
+
+            for item in self.diff_only_tree.get_children():
+                self.diff_only_tree.delete(item)
+
+            diff_count = 0
+            if self.merged_df is not None:
+                # 컬럼 업데이트
+                columns = ["Module", "Part", "ItemName"] + self.file_names
+                self.diff_only_tree["columns"] = columns
+
+                for col in columns:
+                    self.diff_only_tree.heading(col, text=col)
+                    if col in ["Module", "Part", "ItemName"]:
+                        self.diff_only_tree.column(col, width=120)
                     else:
-                        file_values[model] = "-"
-                
-                # 차이점이 있는지 확인
-                unique_values = set(v for v in file_values.values() if v != "-")
-                if len(unique_values) > 1:
-                    # 차이점이 있는 항목만 추가 (하이라이트 없이)
-                    row_values = [module, part, item_name]
-                    row_values.extend([file_values.get(model, "-") for model in self.file_names])
-                    
-                    self.diff_only_tree.insert("", "end", values=row_values)
-                    diff_count += 1
-        
-        # 차이점 카운트 업데이트
-        if hasattr(self, 'diff_only_count_label'):
-            self.diff_only_count_label.config(text=f"값이 다른 항목: {diff_count}개")
+                        self.diff_only_tree.column(col, width=150)
+
+                grouped = self.merged_df.groupby(["Module", "Part", "ItemName"])
+
+                for (module, part, item_name), group in grouped:
+                    # 각 파일별 값 추출
+                    file_values = {}
+                    for model in self.file_names:
+                        model_data = group[group["Model"] == model]
+                        if not model_data.empty:
+                            file_values[model] = str(model_data["ItemValue"].iloc[0])
+                        else:
+                            file_values[model] = "-"
+
+                    # 차이점이 있는지 확인
+                    unique_values = set(v for v in file_values.values() if v != "-")
+                    if len(unique_values) > 1:
+                        # 차이점이 있는 항목만 추가 (하이라이트 없이)
+                        row_values = [module, part, item_name]
+                        row_values.extend([file_values.get(model, "-") for model in self.file_names])
+
+                        self.diff_only_tree.insert("", "end", values=row_values)
+                        diff_count += 1
+
+            # 차이점 카운트 업데이트
+            if hasattr(self, 'diff_only_count_label'):
+                self.diff_only_count_label.config(text=f"값이 다른 항목: {diff_count}개")
 
     def create_report_tab(self):
         report_tab = ttk.Frame(self.comparison_notebook)
@@ -1596,38 +1631,46 @@ class DBManager:
                 self.grid_diff_label.config(text=f"값이 다른 항목: {diff_count}")
 
     def update_grid_view(self):
-        """격자뷰 데이터 업데이트 - 트리뷰 구조 (리팩토링됨)"""
-        if not hasattr(self, 'grid_tree'):
-            return
+        """격자뷰 데이터 업데이트
 
-        # 기존 데이터 삭제
-        self._clear_treeview(self.grid_tree)
+        🆕 Week 1-2 Day 5: ComparisonTab으로 위임
+        """
+        if USE_COMPARISON_TAB and hasattr(self, 'comparison_tab'):
+            # 🆕 신규: ComparisonTab 사용
+            self.comparison_tab.update_grid_view()
+        else:
+            # 레거시: 기존 로직 유지
+            if not hasattr(self, 'grid_tree'):
+                return
 
-        if self.merged_df is None or self.merged_df.empty:
-            # 통계 정보 초기화
-            if hasattr(self, 'grid_total_label'):
-                self.grid_total_label.config(text="총 파라미터: 0개")
-                self.grid_modules_label.config(text="모듈 수: 0개")
-                self.grid_parts_label.config(text="파트 수: 0개")
-            return
+            # 기존 데이터 삭제
+            self._clear_treeview(self.grid_tree)
 
-        # 동적 컬럼 업데이트
-        columns = tuple(self.file_names) if self.file_names else ("값",)
-        self.grid_tree["columns"] = columns
+            if self.merged_df is None or self.merged_df.empty:
+                # 통계 정보 초기화
+                if hasattr(self, 'grid_total_label'):
+                    self.grid_total_label.config(text="총 파라미터: 0개")
+                    self.grid_modules_label.config(text="모듈 수: 0개")
+                    self.grid_parts_label.config(text="파트 수: 0개")
+                return
 
-        # 컬럼 헤딩 업데이트
-        for col in columns:
-            self.grid_tree.heading(col, text=col, anchor="center")
-            self.grid_tree.column(col, width=150, anchor="center")
+            # 동적 컬럼 업데이트
+            columns = tuple(self.file_names) if self.file_names else ("값",)
+            self.grid_tree["columns"] = columns
 
-        # 계층별 스타일 태그 설정
-        self._configure_grid_view_tags()
+            # 컬럼 헤딩 업데이트
+            for col in columns:
+                self.grid_tree.heading(col, text=col, anchor="center")
+                self.grid_tree.column(col, width=150, anchor="center")
 
-        # 계층 구조 데이터 구성
-        modules_data, total_params, diff_count = self._build_grid_hierarchy_data(columns)
+            # 계층별 스타일 태그 설정
+            self._configure_grid_view_tags()
 
-        # 트리뷰에 계층 구조로 데이터 추가 및 통계 업데이트
-        self._populate_grid_tree(modules_data, columns, diff_count)
+            # 계층 구조 데이터 구성
+            modules_data, total_params, diff_count = self._build_grid_hierarchy_data(columns)
+
+            # 트리뷰에 계층 구조로 데이터 추가 및 통계 업데이트
+            self._populate_grid_tree(modules_data, columns, diff_count)
 
     def create_comparison_tab(self):
         comparison_frame = ttk.Frame(self.comparison_notebook)
@@ -2491,15 +2534,23 @@ class DBManager:
         self.update_checked_count()
 
     def update_comparison_view(self, search_filter=""):
-        """비교 뷰 업데이트"""
-        # 트리뷰 초기화
-        saved_checkboxes = self._initialize_comparison_tree()
+        """비교 뷰 업데이트 (Full List Tab)
 
-        # 데이터 처리
-        diff_count, total_items, filtered_items = self._process_comparison_items(search_filter, saved_checkboxes)
+        🆕 Week 1-2 Day 5: ComparisonTab으로 위임
+        """
+        if USE_COMPARISON_TAB and hasattr(self, 'comparison_tab'):
+            # 🆕 신규: ComparisonTab 사용
+            self.comparison_tab.update_comparison_view(search_filter)
+        else:
+            # 레거시: 기존 로직 유지
+            # 트리뷰 초기화
+            saved_checkboxes = self._initialize_comparison_tree()
 
-        # 상태 업데이트
-        self._update_comparison_status(diff_count, total_items, filtered_items, search_filter)
+            # 데이터 처리
+            diff_count, total_items, filtered_items = self._process_comparison_items(search_filter, saved_checkboxes)
+
+            # 상태 업데이트
+            self._update_comparison_status(diff_count, total_items, filtered_items, search_filter)
 
     def _initialize_comparison_tree(self):
         """비교 트리뷰 초기화 - 체크박스 상태 저장 및 반환"""
