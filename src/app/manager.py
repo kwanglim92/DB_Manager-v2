@@ -205,7 +205,7 @@ class DBManager:
         """
         데이터베이스 연결을 반환합니다.
         다른 모듈들(qc.py, defaultdb.py, file_handler.py)에서 사용됩니다.
-        
+
         Returns:
             sqlite3.Connection: 데이터베이스 연결 객체
         """
@@ -214,6 +214,124 @@ class DBManager:
             return sqlite3.connect(self.db_schema.db_path)
         else:
             raise Exception("DBSchema가 초기화되지 않았습니다.")
+
+    # ========================================================================
+    # Helper Methods (Refactored 2025-11-16)
+    # ========================================================================
+
+    def _create_modal_dialog(self, title, geometry, parent=None):
+        """
+        모달 다이얼로그 생성 및 공통 설정
+
+        Args:
+            title (str): 다이얼로그 제목
+            geometry (str): 다이얼로그 크기 (예: "600x400")
+            parent (tk.Widget, optional): 부모 위젯 (기본값: self.window)
+
+        Returns:
+            tk.Toplevel: 설정된 다이얼로그 객체
+        """
+        if parent is None:
+            parent = self.window
+
+        dialog = tk.Toplevel(parent)
+        dialog.title(title)
+        dialog.geometry(geometry)
+        dialog.transient(parent)
+        dialog.grab_set()
+
+        # 부모 창 중앙에 배치 시도
+        try:
+            from app.utils import center_dialog_on_parent
+            center_dialog_on_parent(dialog, parent)
+        except ImportError:
+            # fallback: 화면 중앙에 배치
+            dialog.geometry("+%d+%d" % (parent.winfo_rootx() + 50, parent.winfo_rooty() + 50))
+
+        return dialog
+
+    def _require_maintenance_mode(self, action_name="이 작업"):
+        """
+        유지보수 모드 권한 확인
+
+        Args:
+            action_name (str): 작업 이름 (에러 메시지에 표시)
+
+        Returns:
+            bool: 권한이 있으면 True, 없으면 False (경고 메시지 표시)
+        """
+        if not self.maint_mode:
+            messagebox.showwarning(
+                "권한 없음",
+                f"{action_name}은(는) 유지보수 모드에서만 사용할 수 있습니다."
+            )
+            return False
+        return True
+
+    def _require_admin_mode(self, action_name="이 작업"):
+        """
+        관리자 모드 권한 확인
+
+        Args:
+            action_name (str): 작업 이름 (에러 메시지에 표시)
+
+        Returns:
+            bool: 권한이 있으면 True, 없으면 False (경고 메시지 표시)
+        """
+        if not self.admin_mode:
+            messagebox.showwarning(
+                "권한 없음",
+                f"{action_name}은(는) 관리자 모드에서만 사용할 수 있습니다."
+            )
+            return False
+        return True
+
+    def _clear_treeview(self, treeview):
+        """
+        Treeview의 모든 항목 제거
+
+        Args:
+            treeview (ttk.Treeview): 제거할 Treeview 객체
+        """
+        for item in treeview.get_children():
+            treeview.delete(item)
+
+    def _show_error(self, title, message):
+        """
+        에러 메시지 박스 표시 및 로그 기록
+
+        Args:
+            title (str): 에러 제목
+            message (str): 에러 메시지
+        """
+        messagebox.showerror(title, message)
+        self.update_log(f"ERROR: {title} - {message}")
+
+    def _show_info(self, title, message):
+        """
+        정보 메시지 박스 표시 및 로그 기록
+
+        Args:
+            title (str): 정보 제목
+            message (str): 정보 메시지
+        """
+        messagebox.showinfo(title, message)
+        self.update_log(f"INFO: {message}")
+
+    def _show_warning(self, title, message):
+        """
+        경고 메시지 박스 표시 및 로그 기록
+
+        Args:
+            title (str): 경고 제목
+            message (str): 경고 메시지
+        """
+        messagebox.showwarning(title, message)
+        self.update_log(f"WARNING: {message}")
+
+    # ========================================================================
+    # End of Helper Methods
+    # ========================================================================
 
     def show_about(self):
         """프로그램 정보 다이얼로그 표시"""
@@ -1755,8 +1873,7 @@ class DBManager:
 
     def add_to_default_db(self):
         """체크된 항목들을 Default DB로 전송 - 중복도 기반 통계 분석"""
-        if not self.maint_mode:
-            messagebox.showwarning("권한 없음", "유지보수 모드에서만 Default DB에 항목을 추가할 수 있습니다.")
+        if not self._require_maintenance_mode("Default DB 항목 추가"):
             return
 
         # 체크된 항목들 수집
@@ -1781,27 +1898,15 @@ class DBManager:
             selected_items = self.comparison_tree.selection()
 
         if not selected_items:
-            messagebox.showwarning("선택 필요", "Default DB에 추가할 항목을 먼저 선택해주세요.")
+            self._show_warning("선택 필요", "Default DB에 추가할 항목을 먼저 선택해주세요.")
             return
 
         # 장비 유형 선택 또는 새로 생성
         equipment_types = self.db_schema.get_equipment_types()
         type_names = [f"{name} (ID: {type_id})" for type_id, name, _ in equipment_types]
-        
+
         # 고급 선택 다이얼로그
-        dlg = tk.Toplevel(self.window)
-        dlg.title("Default DB 추가 - 통계 기반 기준값 설정")
-        dlg.geometry("700x600")
-        dlg.transient(self.window)
-        dlg.grab_set()
-        
-        # 부모 창 중앙에 배치
-        try:
-            from app.utils import center_dialog_on_parent
-            center_dialog_on_parent(dlg, self.window)
-        except ImportError:
-            # fallback: 화면 중앙에 배치
-            dlg.geometry("+%d+%d" % (self.window.winfo_rootx() + 50, self.window.winfo_rooty() + 50))
+        dlg = self._create_modal_dialog("Default DB 추가 - 통계 기반 기준값 설정", "700x600")
         
         # 장비 유형 선택 프레임
         type_frame = ttk.LabelFrame(dlg, text="🔧 장비 유형 선택", padding=10)
@@ -3684,8 +3789,7 @@ class DBManager:
 
     def add_parameter_dialog(self):
         """새 파라미터 추가 다이얼로그"""
-        if not self.maint_mode:
-            messagebox.showwarning("권한 없음", "유지보수 모드에서만 파라미터를 추가할 수 있습니다.")
+        if not self._require_maintenance_mode("파라미터를 추가"):
             return
             
         if not self.equipment_type_var.get():
@@ -3838,8 +3942,7 @@ class DBManager:
 
     def delete_selected_parameters(self):
         """선택된 파라미터들을 삭제합니다."""
-        if not self.maint_mode:
-            messagebox.showwarning("권한 없음", "유지보수 모드에서만 파라미터를 삭제할 수 있습니다.")
+        if not self._require_maintenance_mode("파라미터를 삭제"):
             return
             
         selected_items = self.default_db_tree.selection()
@@ -3927,8 +4030,7 @@ class DBManager:
 
     def edit_parameter_dialog(self, event):
         """파라미터 편집 다이얼로그"""
-        if not self.maint_mode:
-            messagebox.showwarning("권한 없음", "유지보수 모드에서만 파라미터를 편집할 수 있습니다.")
+        if not self._require_maintenance_mode("파라미터를 편집"):
             return
             
         selected_items = self.default_db_tree.selection()
@@ -4915,8 +5017,7 @@ class DBManager:
     def toggle_performance_status(self):
         """선택된 파라미터의 Performance 상태 토글"""
         try:
-            if not self.maint_mode:
-                messagebox.showwarning("권한 없음", "유지보수 모드에서만 Performance 상태를 변경할 수 있습니다.")
+            if not self._require_maintenance_mode("Performance 상태를 변경"):
                 return
             
             selected_items = self.default_db_tree.selection()
@@ -5026,8 +5127,7 @@ class DBManager:
     def set_performance_status(self, is_performance):
         """선택된 파라미터의 Check list 상태 설정"""
         try:
-            if not self.maint_mode:
-                messagebox.showwarning("권한 없음", "유지보수 모드에서만 Check list 상태를 변경할 수 있습니다.")
+            if not self._require_maintenance_mode("Check list 상태를 변경"):
                 return
             
             selected_items = self.default_db_tree.selection()
