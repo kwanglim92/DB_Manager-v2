@@ -14,6 +14,7 @@ from app.data_utils import numeric_sort_key, calculate_string_similarity
 from app.config_manager import ConfigManager
 from app.file_service import FileService, export_dataframe_to_file, export_tree_data_to_file
 from app.dialog_helpers import create_parameter_dialog, center_dialog, validate_numeric_range, handle_error
+import logging
 
 # 🆕 새로운 설정 시스템 (선택적 사용)
 try:
@@ -59,7 +60,7 @@ class DBManager:
         try:
             self.db_schema = DBSchema()
         except Exception as e:
-            print(f"DB 스키마 초기화 실패: {str(e)}")
+            logging.error(f"DB 스키마 초기화 실패: {str(e)}")
             import traceback
             traceback.print_exc()
             self.db_schema = None
@@ -119,7 +120,7 @@ class DBManager:
             if icon_path and icon_path.exists():
                 self.window.iconbitmap(str(icon_path))
         except Exception as e:
-            print(f"아이콘 로드 실패: {str(e)}")
+            logging.warning(f"아이콘 로드 실패: {str(e)}")
         
         self._setup_common_ui()
     
@@ -137,7 +138,7 @@ class DBManager:
             icon_path = os.path.join(application_path, "resources", "icons", "db_compare.ico")
             self.window.iconbitmap(icon_path)
         except Exception as e:
-            print(f"아이콘 로드 실패: {str(e)}")
+            logging.warning(f"아이콘 로드 실패: {str(e)}")
         
         self._setup_common_ui()
     
@@ -194,7 +195,7 @@ class DBManager:
                 
         except Exception as e:
             self.update_log(f"서비스 레이어 초기화 실패: {str(e)}")
-            print(f"Service layer initialization failed: {str(e)}")
+            logging.error(f"Service layer initialization failed: {str(e)}")
     
     def _should_use_service(self, service_name: str) -> bool:
         """특정 서비스 사용 여부 확인"""
@@ -414,7 +415,7 @@ class DBManager:
 
     def show_user_guide(self, event=None):
         """사용자 가이드 다이얼로그 표시"""
-        print("사용 설명서가 호출되었습니다. (F1 키 또는 메뉴 선택)")
+        logging.info("사용 설명서가 호출되었습니다. (F1 키 또는 메뉴 선택)")
         guide_window = tk.Toplevel(self.window)
         guide_window.title("DB 관리 도구 사용 설명서")
         guide_window.geometry("800x600")
@@ -839,7 +840,7 @@ class DBManager:
             error_msg = f"유지보수 모드 활성화 중 오류 발생: {str(e)}"
             self.update_log(f"❌ {error_msg}")
             messagebox.showerror("오류", error_msg)
-            print(f"DEBUG - enable_maint_features error: {e}")
+            logging.debug(f"enable_maint_features error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1619,10 +1620,10 @@ class DBManager:
             self._create_comparison_advanced_filters()
             
             # 초기 상태는 숨겨진 상태로 설정
-            print("Filter panel created - advanced filter hidden by default")
+            logging.debug("Filter panel created - advanced filter hidden by default")
             
         except Exception as e:
-            print(f"Comparison filter panel error: {e}")
+            logging.error(f"Comparison filter panel error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1663,22 +1664,22 @@ class DBManager:
             # 엔지니어 기능 (비교 통계 및 데이터 내보내기) 제거됨
             
         except Exception as e:
-            print(f"Comparison advanced filters error: {e}")
+            logging.error(f"Comparison advanced filters error: {e}")
 
     def _toggle_comparison_advanced_filters(self):
         """전체 목록 탭 고급 필터 토글"""
         try:
-            print(f"Toggle called - Current state: {self.comparison_advanced_filter_visible.get()}")
+            logging.debug(f"Toggle called - Current state: {self.comparison_advanced_filter_visible.get()}")
             
             if self.comparison_advanced_filter_visible.get():
                 # 현재 보이는 상태 → 숨기기
-                print("Hiding advanced filters")
+                logging.debug("Hiding advanced filters")
                 self.comparison_advanced_filter_frame.pack_forget()
                 self.comparison_toggle_advanced_btn.config(text="▼ Filters")
                 self.comparison_advanced_filter_visible.set(False)
             else:
                 # 현재 숨겨진 상태 → 보이기
-                print("Showing advanced filters")
+                logging.debug("Showing advanced filters")
                 self.comparison_advanced_filter_frame.pack(fill=tk.X, pady=(0, 5))
                 self.comparison_toggle_advanced_btn.config(text="▲ Filters")
                 self.comparison_advanced_filter_visible.set(True)
@@ -1689,10 +1690,10 @@ class DBManager:
             if hasattr(self, 'window'):
                 self.window.update_idletasks()
             
-            print(f"Toggle complete - New state: {self.comparison_advanced_filter_visible.get()}")
+            logging.debug(f"Toggle complete - New state: {self.comparison_advanced_filter_visible.get()}")
             
         except Exception as e:
-            print(f"Filter toggle error: {e}")
+            logging.error(f"Filter toggle error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -1703,7 +1704,7 @@ class DBManager:
             self.on_search_changed()
             
         except Exception as e:
-            print(f"Comparison filters apply error: {e}")
+            logging.error(f"Comparison filters apply error: {e}")
 
     def _reset_comparison_filters(self):
         """전체 목록 탭 모든 필터 초기화"""
@@ -1722,7 +1723,7 @@ class DBManager:
             self._apply_comparison_filters()
             
         except Exception as e:
-            print(f"Comparison filters reset error: {e}")
+            logging.error(f"Comparison filters reset error: {e}")
 
     def _update_comparison_filter_options(self):
         """전체 목록 탭 필터 옵션 업데이트"""
@@ -1749,7 +1750,7 @@ class DBManager:
                         self.comparison_part_filter_var.set("All")
                         
         except Exception as e:
-            print(f"Comparison filter options update error: {e}")
+            logging.error(f"Comparison filter options update error: {e}")
 
 
     def add_to_default_db(self):
@@ -2572,7 +2573,7 @@ class DBManager:
         except Exception as e:
             error_msg = f"유지보수 모드 비활성화 중 오류: {str(e)}"
             self.update_log(f"❌ {error_msg}")
-            print(f"DEBUG - disable_maint_features error: {e}")
+            logging.debug(f"disable_maint_features error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -2691,7 +2692,7 @@ class DBManager:
         except Exception as e:
             error_msg = f"QC 검수 탭 생성 중 오류: {str(e)}"
             self.update_log(f"❌ {error_msg}")
-            print(f"DEBUG - create_qc_check_tab error: {e}")
+            logging.debug(f"create_qc_check_tab error: {e}")
             import traceback
             traceback.print_exc()
             # 실패 시 프레임 참조 정리
@@ -2912,7 +2913,7 @@ class DBManager:
         except Exception as e:
             error_msg = f"Default DB 관리 탭 생성 오류: {e}"
             self.update_log(f"❌ {error_msg}")
-            print(f"DEBUG - create_default_db_tab error: {e}")
+            logging.debug(f"create_default_db_tab error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3099,7 +3100,7 @@ class DBManager:
         except Exception as e:
             error_msg = f"장비 유형 동기화 오류: {e}"
             self.update_log(f"❌ {error_msg}")
-            print(f"DEBUG - refresh_equipment_types error: {e}")
+            logging.debug(f"refresh_equipment_types error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3251,7 +3252,7 @@ class DBManager:
         except Exception as e:
             error_msg = f"장비 유형 선택 처리 오류: {e}"
             self.update_log(f"❌ {error_msg}")
-            print(f"DEBUG - on_equipment_type_selected error: {e}")
+            logging.debug(f"on_equipment_type_selected error: {e}")
             import traceback
             traceback.print_exc()
 
@@ -4282,7 +4283,7 @@ class DBManager:
     def export_to_text_file(self):
         """Default DB를 텍스트 파일로 내보내기"""
         try:
-            print("DEBUG: export_to_text_file 함수 시작")
+            logging.debug("export_to_text_file 함수 시작")
             
             if not hasattr(self, 'equipment_type_combo') or not self.equipment_type_combo.get():
                 messagebox.showwarning("경고", "먼저 장비 유형을 선택해주세요.")
@@ -4290,7 +4291,7 @@ class DBManager:
             
             # 현재 선택된 장비 유형 ID 추출
             selected_type = self.equipment_type_combo.get()
-            print(f"DEBUG: Selected type: {selected_type}")
+            logging.debug(f"Selected type: {selected_type}")
             
             if "ID: " not in selected_type:
                 messagebox.showwarning("경고", "유효한 장비 유형을 선택해주세요.")
@@ -4298,7 +4299,7 @@ class DBManager:
             
             type_id = int(selected_type.split("ID: ")[1].split(")")[0])
             type_name = selected_type.split(" (ID:")[0]
-            print(f"DEBUG: type_id: {type_id}, type_name: {type_name}")
+            logging.debug(f"type_id: {type_id}, type_name: {type_name}")
             
             # 파일 저장 대화상자
             from tkinter import filedialog
@@ -4309,10 +4310,10 @@ class DBManager:
             )
             
             if not file_path:
-                print("DEBUG: 파일 경로가 선택되지 않음")
+                logging.debug("파일 경로가 선택되지 않음")
                 return
             
-            print(f"DEBUG: 선택된 파일 경로: {file_path}")
+            logging.debug(f"선택된 파일 경로: {file_path}")
             
             # text_file_handler 초기화
             if not hasattr(self, 'text_file_handler'):
@@ -4320,7 +4321,7 @@ class DBManager:
                 self.text_file_handler = TextFileHandler(self.db_schema)
             
             # text_file_handler를 사용한 내보내기
-            print("DEBUG: text_file_handler를 사용한 내보내기 시작")
+            logging.debug("text_file_handler를 사용한 내보내기 시작")
             success, message = self.text_file_handler.export_to_text_file(type_id, file_path)
             
             if success:
@@ -4333,7 +4334,7 @@ class DBManager:
         except Exception as e:
             import traceback
             error_details = traceback.format_exc()
-            print(f"DEBUG: export_to_text_file 오류:\n{error_details}")
+            logging.debug(f"export_to_text_file 오류:\n{error_details}")
             messagebox.showerror("❌ 오류", f"텍스트 파일 내보내기 중 오류 발생:\n{str(e)}")
             self.update_log(f"텍스트 파일 내보내기 오류: {str(e)}")
 

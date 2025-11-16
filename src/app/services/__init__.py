@@ -74,12 +74,23 @@ class LegacyAdapter:
     """
     기존 코드와의 호환성을 위한 레거시 어댑터
     USE_NEW_SERVICES 플래그를 통해 점진적 전환 지원
+
+    Singleton 패턴을 사용하여 전역 인스턴스 관리
     """
-    
+
+    _instance = None
+
     def __init__(self, service_factory=None):
         self.service_factory = service_factory or ServiceFactory()
         self._use_new_services = self._load_use_new_services_flag()
-    
+
+    @classmethod
+    def get_instance(cls):
+        """Singleton 인스턴스 반환 (지연 초기화)"""
+        if cls._instance is None:
+            cls._instance = cls()
+        return cls._instance
+
     def _load_use_new_services_flag(self) -> bool:
         """USE_NEW_SERVICES 플래그 로드"""
         try:
@@ -89,7 +100,7 @@ class LegacyAdapter:
         except (ImportError, AttributeError) as e:
             # AppConfig 로드 실패 시 기본값 False 반환
             return False
-    
+
     def get_equipment_service(self):
         """장비 서비스 반환 (새 서비스 또는 None)"""
         if self._use_new_services:
@@ -99,7 +110,7 @@ class LegacyAdapter:
                 # 서비스 팩토리 또는 서비스 초기화 실패 시 None 반환
                 return None
         return None
-    
+
     def get_logging_service(self):
         """로깅 서비스 반환"""
         if self._use_new_services:
@@ -110,23 +121,15 @@ class LegacyAdapter:
                 return None
         return None
 
-# 전역 레거시 어댑터 인스턴스 (지연 초기화)
-_legacy_adapter = None
-
-def _get_legacy_adapter():
-    """레거시 어댑터 지연 초기화"""
-    global _legacy_adapter
-    if _legacy_adapter is None:
-        _legacy_adapter = LegacyAdapter()
-    return _legacy_adapter
 
 def get_equipment_service():
-    """전역 장비 서비스 접근"""
-    return _get_legacy_adapter().get_equipment_service()
+    """전역 장비 서비스 접근 (Singleton 패턴 사용)"""
+    return LegacyAdapter.get_instance().get_equipment_service()
+
 
 def get_logging_service():
-    """전역 로깅 서비스 접근"""
-    return _get_legacy_adapter().get_logging_service()
+    """전역 로깅 서비스 접근 (Singleton 패턴 사용)"""
+    return LegacyAdapter.get_instance().get_logging_service()
 
 __all__ = [
     # 인터페이스
