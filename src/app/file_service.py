@@ -2,6 +2,7 @@
 # manager.py에서 추출된 파일 I/O 관련 기능들
 
 import os
+import logging
 import pandas as pd
 import sqlite3
 from tkinter import filedialog, messagebox
@@ -232,9 +233,9 @@ def load_db_file(file_path, file_name):
         df[file_name] = df.iloc[:, -1]  # 마지막 컬럼 값을 사용
         
         return df
-        
+
     except Exception as e:
-        print(f"DB 파일 로드 실패 ({file_name}): {e}")
+        logging.error(f"DB 파일 로드 실패 ({file_name}): {e}")
         return None
 
 
@@ -252,12 +253,12 @@ def load_csv_file(file_path, file_name):
                 return df
             except UnicodeDecodeError:
                 continue
-        
-        print(f"CSV 파일 로드 실패 ({file_name}): 지원되는 인코딩이 없습니다.")
+
+        logging.error(f"CSV 파일 로드 실패 ({file_name}): 지원되는 인코딩이 없습니다.")
         return None
-        
+
     except Exception as e:
-        print(f"CSV 파일 로드 실패 ({file_name}): {e}")
+        logging.error(f"CSV 파일 로드 실패 ({file_name}): {e}")
         return None
 
 
@@ -275,12 +276,12 @@ def load_txt_file(file_path, file_name):
                 return df
             except UnicodeDecodeError:
                 continue
-        
-        print(f"텍스트 파일 로드 실패 ({file_name}): 지원되는 인코딩이 없습니다.")
+
+        logging.error(f"텍스트 파일 로드 실패 ({file_name}): 지원되는 인코딩이 없습니다.")
         return None
-        
+
     except Exception as e:
-        print(f"텍스트 파일 로드 실패 ({file_name}): {e}")
+        logging.error(f"텍스트 파일 로드 실패 ({file_name}): {e}")
         return None
 
 
@@ -311,9 +312,9 @@ def merge_dataframes(dataframes):
                 merged = pd.concat([merged, df], ignore_index=True, sort=False)
         
         return merged
-        
+
     except Exception as e:
-        print(f"DataFrame 병합 실패: {e}")
+        logging.error(f"DataFrame 병합 실패: {e}")
         return None
 
 

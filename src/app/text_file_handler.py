@@ -2,6 +2,7 @@
 
 import os
 import re
+import logging
 from typing import List, Dict, Tuple, Optional
 from datetime import datetime
 import tkinter as tk
@@ -86,9 +87,9 @@ class TextFileHandler:
                     
                     # 탭으로 분리
                     parts = line.split('\t')
-                    
+
                     if len(parts) != 6:
-                        print(f"라인 {line_number}: 컬럼 개수가 맞지 않습니다. (실제: {len(parts)})")
+                        logging.warning(f"라인 {line_number}: 컬럼 개수가 맞지 않습니다. (실제: {len(parts)})")
                         continue
                     
                     # 데이터 정리
@@ -104,7 +105,7 @@ class TextFileHandler:
                     
                     # 필수 필드 검증
                     if not data_row['item_name'] or not data_row['item_value']:
-                        print(f"라인 {line_number}: 필수 필드(ItemName 또는 ItemValue)가 비어있습니다.")
+                        logging.warning(f"라인 {line_number}: 필수 필드(ItemName 또는 ItemValue)가 비어있습니다.")
                         continue
                     
                     parsed_data.append(data_row)
@@ -183,7 +184,7 @@ class TextFileHandler:
                     
                 except Exception as e:
                     error_count += 1
-                    print(f"라인 {data_row['line_number']} 처리 중 오류: {str(e)}")
+                    logging.error(f"라인 {data_row['line_number']} 처리 중 오류: {str(e)}")
             
             # 결과 메시지 생성
             result_message = f"""텍스트 파일 Import 완료:

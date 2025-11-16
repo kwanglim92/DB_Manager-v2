@@ -28,17 +28,19 @@ from .interfaces import (
 
 # 구현체들 (점진적 전환을 위해 조건부 import)
 try:
+    import logging
     from .equipment import EquipmentService
     # 아직 구현되지 않은 서비스들은 주석 처리
     # from .data import DataProcessingService, FileService
     # from .validation import ValidationService, QCService
-    
+
     # 서비스 팩토리
     from .service_factory import ServiceFactory
-    
+
     SERVICES_AVAILABLE = True
 except ImportError as e:
-    print(f"서비스 import 실패: {e}")
+    import logging
+    logging.error(f"서비스 import 실패: {e}")
     SERVICES_AVAILABLE = False
     # import 실패 시 기본 팩토리만 사용
     from .service_factory import ServiceFactory

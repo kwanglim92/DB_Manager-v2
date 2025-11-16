@@ -1,6 +1,7 @@
 # 비교 탭 및 기능 - 파일 비교 및 차이점 표시
 
 import os
+import logging
 import tkinter as tk
 from tkinter import ttk, messagebox
 import pandas as pd
@@ -519,9 +520,9 @@ def add_comparison_functions_to_class(cls):
             self.grid_advanced_filter_frame = ttk.Frame(self.grid_filter_frame)
             
             self._create_grid_advanced_filters()
-            
+
         except Exception as e:
-            print(f"Grid filter panel error: {e}")
+            logging.error(f"Grid filter panel error: {e}")
 
     def _create_grid_advanced_filters(self):
         """그리드 뷰 고급 필터 생성 - Module, Part만 포함 (Data Type 제외)"""
@@ -567,9 +568,9 @@ def add_comparison_functions_to_class(cls):
             # 필터 초기화 버튼
             reset_btn = ttk.Button(control_frame, text="🔄 필터 초기화", command=self._reset_grid_filters)
             reset_btn.pack(side=tk.LEFT)
-            
+
         except Exception as e:
-            print(f"Grid advanced filters error: {e}")
+            logging.error(f"Grid advanced filters error: {e}")
 
     def _toggle_grid_advanced_filters(self):
         """그리드 뷰 고급 필터 토글"""
@@ -642,9 +643,9 @@ def add_comparison_functions_to_class(cls):
             for idx, row in filtered_df.iterrows():
                 values = [str(val) if pd.notna(val) else "" for val in row]
                 self.grid_tree.insert("", "end", values=values)
-                
+
         except Exception as e:
-            print(f"Grid view update error: {e}")
+            logging.error(f"Grid view update error: {e}")
 
     def _update_grid_filter_options(self):
         """그리드 뷰 필터 옵션 업데이트"""
@@ -667,9 +668,9 @@ def add_comparison_functions_to_class(cls):
                 self.grid_part_filter_combo['values'] = part_values
                 if not self.grid_part_filter_var.get():
                     self.grid_part_filter_var.set("All")
-                    
+
         except Exception as e:
-            print(f"Grid filter options update error: {e}")
+            logging.error(f"Grid filter options update error: {e}")
 
     def _clear_grid_search(self):
         """그리드 뷰 검색 초기화"""
@@ -690,9 +691,9 @@ def add_comparison_functions_to_class(cls):
             
             # 필터 적용
             self._apply_grid_filters()
-            
+
         except Exception as e:
-            print(f"Grid filters reset error: {e}")
+            logging.error(f"Grid filters reset error: {e}")
 
     def _show_comparison_statistics(self):
         """비교 통계 표시 (엔지니어 기능)"""

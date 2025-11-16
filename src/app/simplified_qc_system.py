@@ -4,6 +4,7 @@
 """
 
 import os
+import logging
 import tkinter as tk
 from tkinter import messagebox
 import pandas as pd
@@ -17,7 +18,7 @@ try:
     CHECKLIST_VALIDATOR_AVAILABLE = True
 except ImportError:
     CHECKLIST_VALIDATOR_AVAILABLE = False
-    print("[WARN] ChecklistValidator를 불러올 수 없습니다. Check list 검증이 비활성화됩니다.")
+    logging.warning("[WARN] ChecklistValidator를 불러올 수 없습니다. Check list 검증이 비활성화됩니다.")
 
 # Phase 1.5: qc_inspection_v2 통합
 try:
@@ -25,7 +26,7 @@ try:
     QC_INSPECTION_V2_AVAILABLE = True
 except ImportError:
     QC_INSPECTION_V2_AVAILABLE = False
-    print("[WARN] qc_inspection_v2를 불러올 수 없습니다. v2 검증이 비활성화됩니다.")
+    logging.warning("[WARN] qc_inspection_v2를 불러올 수 없습니다. v2 검증이 비활성화됩니다.")
 
 class SimplifiedQCSystem:
     """간소화된 QC 검수 시스템"""

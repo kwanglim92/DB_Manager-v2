@@ -5,6 +5,7 @@ DB Manager 애플리케이션 메인 진입점
 
 import sys
 import os
+import logging
 
 # 현재 파일의 디렉토리를 sys.path에 추가하여 app 모듈을 찾을 수 있도록 함
 current_dir = os.path.dirname(os.path.abspath(__file__))
@@ -19,7 +20,7 @@ def main():
         app = DBManager()
         app.window.mainloop()
     except Exception as e:
-        print(f"애플리케이션 실행 중 오류 발생: {e}")
+        logging.error(f"애플리케이션 실행 중 오류 발생: {e}")
         import traceback
         traceback.print_exc()
 

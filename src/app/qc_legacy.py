@@ -1,6 +1,7 @@
 # QC(품질검수) 관련 함수 및 탭 생성 로직을 src/qc_check_helpers.py에서 이관. add_qc_check_functions_to_class, create_qc_check_tab, perform_qc_check 등 포함. 한글 주석 및 기존 UI 구조 유지.
 
 import os
+import logging
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
@@ -77,7 +78,7 @@ class QCValidator:
                                 "severity": "중간" if confidence_val < 0.3 else "낮음"
                             })
             except Exception as e:
-                print(f"신뢰도 검사 중 오류: {e}")
+                logging.error(f"신뢰도 검사 중 오류: {e}")
         
         # 발생횟수가 1인 파라미터 (단일 소스)
         if 'occurrence_count' in df.columns and 'total_files' in df.columns:
@@ -96,7 +97,7 @@ class QCValidator:
                             "severity": "낮음"
                         })
             except Exception as e:
-                print(f"발생횟수 검사 중 오류: {e}")
+                logging.error(f"발생횟수 검사 중 오류: {e}")
         
         return results
 

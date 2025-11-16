@@ -1,6 +1,7 @@
 # 간소화된 QC 검수 보고서 생성 모듈
 
 import os
+import logging
 from datetime import datetime
 from typing import Dict, List, Any, Optional
 import pandas as pd
@@ -63,9 +64,9 @@ def export_qc_results_to_excel(qc_results: List[Dict], equipment_name: str,
                 results_df.to_excel(writer, sheet_name='검수 결과', index=False)
         
         return True
-        
+
     except Exception as e:
-        print(f"Excel 보고서 생성 오류: {e}")
+        logging.error(f"Excel 보고서 생성 오류: {e}")
         return False
 
 
@@ -93,7 +94,7 @@ def export_qc_results_to_csv(qc_results: List[Dict], equipment_name: str,
         return True
 
     except Exception as e:
-        print(f"CSV 보고서 생성 오류: {e}")
+        logging.error(f"CSV 보고서 생성 오류: {e}")
         return False
 
 
@@ -234,7 +235,7 @@ def export_full_qc_report_to_excel(qc_result: Dict[str, Any], equipment_name: st
         return True
 
     except Exception as e:
-        print(f"전체 QC 보고서 생성 오류: {e}")
+        logging.error(f"전체 QC 보고서 생성 오류: {e}")
         import traceback
         traceback.print_exc()
         return False

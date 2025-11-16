@@ -1,6 +1,7 @@
 # Enhanced QC 기능 - Check list 모드 및 파일 선택 지원
 
 import os
+import logging
 import tkinter as tk
 from tkinter import ttk, messagebox, filedialog
 import pandas as pd
@@ -63,7 +64,7 @@ class EnhancedQCValidator:
                                     "pass_fail": "FAIL"
                                 })
                     except Exception as confidence_error:
-                        print(f"신뢰도 검사 중 오류: {confidence_error}")
+                        logging.error(f"신뢰도 검사 중 오류: {confidence_error}")
                 
                 # Check list 파라미터의 사양 범위 누락 검사
                 missing_specs = checklist_params[
@@ -83,7 +84,7 @@ class EnhancedQCValidator:
                         "pass_fail": "FAIL"
                     })
             except Exception as e:
-                print(f"Check list 파라미터 검사 중 오류: {e}")
+                logging.error(f"Check list 파라미터 검사 중 오류: {e}")
         
         return results
 

@@ -4,6 +4,7 @@ QC Check list 검증 모듈
 QC 검수 시 Check list 기반으로 파라미터를 검증합니다.
 """
 
+import logging
 import pandas as pd
 from typing import Dict, List, Tuple
 
@@ -28,7 +29,7 @@ class ChecklistValidator:
         try:
             return self.checklist_service.get_equipment_checklist(self.equipment_type_id)
         except Exception as e:
-            print(f"Check list 로드 실패: {e}")
+            logging.error(f"Check list 로드 실패: {e}")
             return []
 
     def validate_parameters(self, df: pd.DataFrame) -> Dict:
@@ -55,7 +56,7 @@ class ChecklistValidator:
             return self._empty_result()
 
         if 'ItemName' not in df.columns:
-            print("경고: ItemName 컬럼이 없습니다.")
+            logging.warning("경고: ItemName 컬럼이 없습니다.")
             return self._empty_result()
 
         results = {
@@ -267,7 +268,7 @@ def integrate_checklist_validation(qc_func):
                             }
 
         except Exception as e:
-            print(f"Check list 검증 통합 중 오류: {e}")
+            logging.error(f"Check list 검증 통합 중 오류: {e}")
 
         return result
 

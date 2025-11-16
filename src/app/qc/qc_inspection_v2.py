@@ -35,7 +35,7 @@ def get_active_checklist_items() -> List[ChecklistItem]:
     Returns:
         List[ChecklistItem]: 활성화된 Check list 항목 목록
     """
-    from db_schema import DBSchema
+    from app.schema import DBSchema
 
     db_schema = DBSchema()
 
@@ -79,7 +79,7 @@ def get_exception_item_ids(configuration_id: Optional[int]) -> List[int]:
     if configuration_id is None:
         return []
 
-    from db_schema import DBSchema
+    from app.schema import DBSchema
 
     db_schema = DBSchema()
 

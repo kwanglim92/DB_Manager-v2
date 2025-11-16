@@ -4,6 +4,7 @@ Check list 관리 서비스 구현
 
 import re
 import json
+import logging
 from typing import List, Dict, Optional, Tuple
 
 from ..interfaces.checklist_service_interface import IChecklistService
@@ -201,7 +202,7 @@ class ChecklistService(IChecklistService):
                     return result
 
             except re.error as e:
-                print(f"정규식 오류: {pattern} - {e}")
+                logging.error(f"정규식 오류: {pattern} - {e}")
                 continue
 
         # Check list에 없음

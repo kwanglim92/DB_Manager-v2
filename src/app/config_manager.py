@@ -3,6 +3,7 @@
 
 import os
 import json
+import logging
 import tkinter as tk
 from tkinter import messagebox, simpledialog
 
@@ -89,12 +90,13 @@ def setup_service_layer(db_schema, update_log_callback=None):
         else:
             if update_log_callback:
                 update_log_callback("DB 스키마가 없어 서비스 팩토리를 초기화할 수 없습니다")
-                
+
+
     except Exception as e:
         if update_log_callback:
             update_log_callback(f"서비스 레이어 초기화 실패: {str(e)}")
-        print(f"Service layer initialization failed: {str(e)}")
-    
+        logging.error(f"Service layer initialization failed: {str(e)}")
+
     return service_factory, legacy_adapter, use_new_services
 
 def should_use_service(service_name, service_factory, use_new_services):

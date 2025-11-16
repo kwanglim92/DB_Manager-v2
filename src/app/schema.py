@@ -2,6 +2,7 @@
 
 import os
 import sqlite3
+import logging
 from datetime import datetime
 from contextlib import contextmanager
 
@@ -36,15 +37,52 @@ class DBSchema:
         """핵심 테이블들만 생성"""
         with self.get_connection() as conn:
             cursor = conn.cursor()
-            
-            # 장비 유형 테이블
+
+            # Phase 1.5: 장비 모델 테이블 (최상위 계층)
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Equipment_Models (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                model_name TEXT NOT NULL UNIQUE,
+                description TEXT,
+                display_order INTEGER DEFAULT 999,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            )
+            ''')
+
+            # Phase 1.5: 장비 유형 테이블 (Equipment_Models의 하위 계층)
             cursor.execute('''
             CREATE TABLE IF NOT EXISTS Equipment_Types (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                type_name TEXT NOT NULL UNIQUE,
+                model_id INTEGER,
+                type_name TEXT NOT NULL,
+                description TEXT,
+                display_order INTEGER DEFAULT 999,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (model_id) REFERENCES Equipment_Models(id) ON DELETE CASCADE,
+                UNIQUE (model_id, type_name)
+            )
+            ''')
+
+            # Phase 1.5: 장비 구성 테이블 (Equipment_Types의 하위 계층)
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Equipment_Configurations (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                type_id INTEGER NOT NULL,
+                configuration_name TEXT NOT NULL,
+                port_type TEXT,
+                port_count INTEGER,
+                wafer_size TEXT,
+                wafer_count INTEGER,
+                custom_options TEXT,
+                is_customer_specific INTEGER DEFAULT 0,
+                customer_name TEXT,
                 description TEXT,
                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (type_id) REFERENCES Equipment_Types(id) ON DELETE CASCADE,
+                UNIQUE (type_id, configuration_name)
             )
             ''')
             
@@ -138,6 +176,50 @@ class DBSchema:
             )
             ''')
 
+            # Phase 2: 출고 장비 메타데이터 테이블
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Shipped_Equipment (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                equipment_type_id INTEGER NOT NULL,
+                configuration_id INTEGER NOT NULL,
+                serial_number TEXT NOT NULL UNIQUE,
+                customer_name TEXT NOT NULL,
+                ship_date DATE,
+                is_refit INTEGER DEFAULT 0,
+                original_serial_number TEXT,
+                notes TEXT,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (equipment_type_id) REFERENCES Equipment_Types(id) ON DELETE RESTRICT,
+                FOREIGN KEY (configuration_id) REFERENCES Equipment_Configurations(id) ON DELETE RESTRICT
+            )
+            ''')
+
+            # Phase 2: 출고 장비 파라미터 Raw Data 테이블
+            cursor.execute('''
+            CREATE TABLE IF NOT EXISTS Shipped_Equipment_Parameters (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                shipped_equipment_id INTEGER NOT NULL,
+                parameter_name TEXT NOT NULL,
+                parameter_value TEXT NOT NULL,
+                module TEXT,
+                part TEXT,
+                data_type TEXT,
+                FOREIGN KEY (shipped_equipment_id) REFERENCES Shipped_Equipment(id) ON DELETE CASCADE,
+                UNIQUE (shipped_equipment_id, parameter_name)
+            )
+            ''')
+
+            # Phase 2: 인덱스 생성
+            cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_shipped_params_equipment
+            ON Shipped_Equipment_Parameters(shipped_equipment_id)
+            ''')
+
+            cursor.execute('''
+            CREATE INDEX IF NOT EXISTS idx_shipped_params_name
+            ON Shipped_Equipment_Parameters(parameter_name)
+            ''')
+
             conn.commit()
             
             # is_performance 컬럼이 있다면 is_checklist로 마이그레이션
@@ -156,12 +238,12 @@ class DBSchema:
                 
                 # 기존 is_performance 값을 is_checklist로 복사
                 cursor.execute("UPDATE Default_DB_Values SET is_checklist = is_performance")
-                
+
                 conn.commit()
-                print("✅ is_performance → is_checklist 마이그레이션 완료")
-                
+                logging.info("✅ is_performance → is_checklist 마이그레이션 완료")
+
         except Exception as e:
-            print(f"마이그레이션 중 오류 (무시 가능): {e}")
+            logging.warning(f"마이그레이션 중 오류 (무시 가능): {e}")
 
     # ==================== 장비 유형 관리 ====================
     
