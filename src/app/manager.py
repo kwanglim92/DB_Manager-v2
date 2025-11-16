@@ -617,6 +617,11 @@ class DBManager:
                 if not self.maint_mode:
                     self.enable_maint_features()
 
+                # Default DB 탭 생성 확인 (QC 모드가 이미 활성화된 경우 대비)
+                if not hasattr(self, 'default_db_frame') or self.default_db_frame is None:
+                    self.update_log("🔧 Default DB 관리 탭 생성 중...")
+                    self.create_default_db_tab()
+
                 # 상태 업데이트
                 self.status_bar.config(text="⚡ 관리자 모드 (모든 권한)")
                 self.update_log("🔐 관리자 모드가 활성화되었습니다.")
