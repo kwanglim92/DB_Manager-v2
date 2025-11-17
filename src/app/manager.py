@@ -15,6 +15,16 @@ from app.config_manager import ConfigManager
 from app.file_service import FileService, export_dataframe_to_file, export_tree_data_to_file
 from app.dialog_helpers import create_parameter_dialog, center_dialog, validate_numeric_range, handle_error
 
+# 🆕 새로운 Default DB 및 QC 분리 시스템
+try:
+    from app.services.default_db_service import DefaultDBService
+    from app.services.qc_spec_service import QCSpecService
+    from app.dialogs.default_db_config_dialog import DefaultDBConfigDialog
+    USE_NEW_DB_SYSTEM = True
+except ImportError:
+    USE_NEW_DB_SYSTEM = False
+    print("Warning: New DB system not available")
+
 # 🆕 새로운 설정 시스템 (선택적 사용)
 try:
     from app.core.config import AppConfig
@@ -621,6 +631,10 @@ class DBManager:
                 if not hasattr(self, 'default_db_frame') or self.default_db_frame is None:
                     self.update_log("🔧 Default DB 관리 탭 생성 중...")
                     self.create_default_db_tab()
+                
+                # 🆕 신규 QC 스펙 관리 탭 생성 (신규 시스템에서만)
+                if USE_NEW_DB_SYSTEM:
+                    self.create_qc_spec_management_tab()
 
                 # 상태 업데이트
                 self.status_bar.config(text="⚡ 관리자 모드 (모든 권한)")
@@ -2696,7 +2710,7 @@ class DBManager:
             self.qc_check_frame = None
 
     def create_default_db_tab(self):
-        """Default DB 관리 탭 생성 - 중복 생성 방지 강화"""
+        """Default DB 관리 탭 생성 - 신규 시스템 적용"""
         try:
             self.update_log("🔧 Default DB 관리 탭 생성 시작...")
             
@@ -2721,6 +2735,12 @@ class DBManager:
             if not self.db_schema:
                 self.update_log("❌ DBSchema가 초기화되지 않음 - 탭 생성 취소")
                 return
+            
+            # 신규 서비스 초기화
+            if USE_NEW_DB_SYSTEM:
+                self.default_db_service = DefaultDBService(self.db_schema)
+                self.qc_spec_service = QCSpecService(self.db_schema)
+                self.update_log("✅ 신규 Default DB 및 QC 분리 시스템 초기화")
                 
             self.default_db_frame = ttk.Frame(self.main_notebook)
             self.main_notebook.add(self.default_db_frame, text="Default DB 관리")
@@ -2762,22 +2782,66 @@ class DBManager:
                                    command=self.refresh_equipment_types, width=10)
             refresh_btn.pack(side=tk.LEFT, padx=(0, 6))
 
-            # Configuration 선택 (Phase 1.5 Week 2 Day 4)
-            config_select_frame = ttk.Frame(equipment_frame)
-            config_select_frame.pack(fill=tk.X, pady=(8, 0))
+            if USE_NEW_DB_SYSTEM:
+                # 🆕 신규 3-엘리먼트 구성 시스템
+                config_select_frame = ttk.Frame(equipment_frame)
+                config_select_frame.pack(fill=tk.X, pady=(8, 0))
+                
+                # AE Type 선택
+                ttk.Label(config_select_frame, text="AE Type:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
+                self.ae_type_var = tk.StringVar()
+                self.ae_type_combo = ttk.Combobox(config_select_frame, textvariable=self.ae_type_var,
+                                                 values=['일체형', '분리형'],
+                                                 state="readonly", width=10, font=("Segoe UI", 9))
+                self.ae_type_combo.pack(side=tk.LEFT, padx=(0, 10))
+                self.ae_type_combo.bind("<<ComboboxSelected>>", self.on_configuration_changed)
+                
+                # Cabinet Type 선택
+                ttk.Label(config_select_frame, text="Cabinet:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
+                self.cabinet_type_var = tk.StringVar()
+                self.cabinet_type_combo = ttk.Combobox(config_select_frame, textvariable=self.cabinet_type_var,
+                                                      values=['T1', 'PB', '없음'],
+                                                      state="readonly", width=10, font=("Segoe UI", 9))
+                self.cabinet_type_combo.pack(side=tk.LEFT, padx=(0, 10))
+                self.cabinet_type_combo.bind("<<ComboboxSelected>>", self.on_configuration_changed)
+                
+                # EFEM Type 선택
+                ttk.Label(config_select_frame, text="EFEM:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
+                self.efem_type_var = tk.StringVar()
+                self.efem_type_combo = ttk.Combobox(config_select_frame, textvariable=self.efem_type_var,
+                                                   values=['Single', 'Double', 'None'],
+                                                   state="readonly", width=10, font=("Segoe UI", 9))
+                self.efem_type_combo.pack(side=tk.LEFT, padx=(0, 10))
+                self.efem_type_combo.bind("<<ComboboxSelected>>", self.on_configuration_changed)
+                
+                # Configuration Code 표시
+                self.config_code_label = ttk.Label(config_select_frame, text="Code: -", 
+                                                  font=("Segoe UI", 9, "bold"), foreground="#2E5BBA")
+                self.config_code_label.pack(side=tk.LEFT, padx=(10, 8))
+                
+                # Advanced Config 버튼 (선택적 옵션)
+                advanced_btn = ttk.Button(config_select_frame, text="⚙️ Advanced",
+                                        command=self.open_advanced_config_dialog, width=12)
+                advanced_btn.pack(side=tk.LEFT, padx=(5, 0))
+                
+                self.update_log("✅ 신규 3-엘리먼트 Configuration 시스템 생성 완료")
+            else:
+                # 기존 Configuration 시스템 유지
+                config_select_frame = ttk.Frame(equipment_frame)
+                config_select_frame.pack(fill=tk.X, pady=(8, 0))
 
-            ttk.Label(config_select_frame, text="Configuration:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 8))
-            self.configuration_var = tk.StringVar()
-            self.configuration_combo = ttk.Combobox(config_select_frame, textvariable=self.configuration_var,
-                                                   state="readonly", width=40, font=("Segoe UI", 9))
-            self.configuration_combo.pack(side=tk.LEFT, padx=(0, 12))
-            self.configuration_combo.bind("<<ComboboxSelected>>", self.on_configuration_selected)
+                ttk.Label(config_select_frame, text="Configuration:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 8))
+                self.configuration_var = tk.StringVar()
+                self.configuration_combo = ttk.Combobox(config_select_frame, textvariable=self.configuration_var,
+                                                       state="readonly", width=40, font=("Segoe UI", 9))
+                self.configuration_combo.pack(side=tk.LEFT, padx=(0, 12))
+                self.configuration_combo.bind("<<ComboboxSelected>>", self.on_configuration_selected)
 
-            # "All (Type Common)" 옵션 표시 레이블
-            self.config_mode_label = ttk.Label(config_select_frame, text="", font=("Segoe UI", 9, "italic"), foreground="gray")
-            self.config_mode_label.pack(side=tk.LEFT, padx=(0, 8))
+                # "All (Type Common)" 옵션 표시 레이블
+                self.config_mode_label = ttk.Label(config_select_frame, text="", font=("Segoe UI", 9, "italic"), foreground="gray")
+                self.config_mode_label.pack(side=tk.LEFT, padx=(0, 8))
 
-            self.update_log("✅ Configuration 콤보박스 생성 완료")
+                self.update_log("✅ Configuration 콤보박스 생성 완료")
 
             # 파라미터 관리 섹션
             param_frame = ttk.LabelFrame(control_frame, text="Parameter Management", padding=12)
@@ -2816,42 +2880,76 @@ class DBManager:
             tree_frame = ttk.Frame(tree_container)
             tree_frame.pack(fill=tk.BOTH, expand=True)
             
-            # 트리뷰 컬럼 정의 (Phase 1.5: Scope 컬럼 추가)
-            columns = ("no", "parameter_name", "scope", "module", "part", "item_type", "default_value", "min_spec", "max_spec",
-                      "is_performance", "description")
+            if USE_NEW_DB_SYSTEM:
+                # 🆕 신규 시스템: min_spec, max_spec 제거
+                columns = ("no", "parameter_name", "config_code", "module", "part", "item_type", "default_value",
+                          "unit", "description")
 
-            self.default_db_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
-            self.update_log("✅ Default DB 트리뷰 생성 완료")
+                self.default_db_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+                self.update_log("✅ Default DB 트리뷰 생성 완료 (QC 스펙 분리 모드)")
 
-            # 컬럼 헤더 설정
-            headers = {
-                "no": "No.",  # 순차 번호 컬럼
-                "parameter_name": "ItemName",
-                "scope": "Scope",  # Phase 1.5: Type Common vs Configuration
-                "module": "Module",
-                "part": "Part",
-                "item_type": "Data Type",
-                "default_value": "Default Value",
-                "min_spec": "Min Spec",
-                "max_spec": "Max Spec",
-                "is_performance": "Check list",
-                "description": "Description"
-            }
+                # 컬럼 헤더 설정
+                headers = {
+                    "no": "No.",
+                    "parameter_name": "ItemName",
+                    "config_code": "Config",
+                    "module": "Module",
+                    "part": "Part",
+                    "item_type": "Data Type",
+                    "default_value": "Default Value",
+                    "unit": "Unit",
+                    "description": "Description"
+                }
 
-            # 컬럼 너비 최적화
-            column_widths = {
-                "no": 50,  # 순차 번호 컬럼 너비
-                "parameter_name": 200,  # 약간 줄임
-                "scope": 100,  # Scope 컬럼
-                "module": 80,
-                "part": 100,
-                "item_type": 85,
-                "default_value": 100,
-                "min_spec": 80,
-                "max_spec": 80,
-                "is_performance": 90,
-                "description": 150
-            }
+                # 컬럼 너비 최적화
+                column_widths = {
+                    "no": 50,
+                    "parameter_name": 220,
+                    "config_code": 120,
+                    "module": 100,
+                    "part": 120,
+                    "item_type": 100,
+                    "default_value": 120,
+                    "unit": 60,
+                    "description": 200
+                }
+            else:
+                # 기존 시스템 유지
+                columns = ("no", "parameter_name", "scope", "module", "part", "item_type", "default_value", "min_spec", "max_spec",
+                          "is_performance", "description")
+
+                self.default_db_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+                self.update_log("✅ Default DB 트리뷰 생성 완료")
+
+                # 컬럼 헤더 설정
+                headers = {
+                    "no": "No.",
+                    "parameter_name": "ItemName",
+                    "scope": "Scope",
+                    "module": "Module",
+                    "part": "Part",
+                    "item_type": "Data Type",
+                    "default_value": "Default Value",
+                    "min_spec": "Min Spec",
+                    "max_spec": "Max Spec",
+                    "is_performance": "Check list",
+                    "description": "Description"
+                }
+
+                # 컬럼 너비 최적화
+                column_widths = {
+                    "no": 50,
+                    "parameter_name": 200,
+                    "scope": 100,
+                    "module": 80,
+                    "part": 100,
+                    "item_type": 85,
+                    "default_value": 100,
+                    "min_spec": 80,
+                    "max_spec": 80,
+                    "is_performance": 90,
+                    "description": 150
+                }
             
             for col in columns:
                 self.default_db_tree.heading(col, text=headers[col])
@@ -2911,6 +3009,159 @@ class DBManager:
             error_msg = f"Default DB 관리 탭 생성 오류: {e}"
             self.update_log(f"❌ {error_msg}")
             print(f"DEBUG - create_default_db_tab error: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def create_qc_spec_management_tab(self):
+        """🆕 QC 스펙 관리 탭 생성 (신규 시스템)"""
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        try:
+            self.update_log("🌟 QC 스펙 관리 탭 생성 시작...")
+            
+            # 기존 탭 중복 검사
+            if hasattr(self, 'main_notebook') and self.main_notebook:
+                for tab_id in range(self.main_notebook.index('end')):
+                    try:
+                        tab_text = self.main_notebook.tab(tab_id, 'text')
+                        if "QC 스펙 관리" in tab_text:
+                            self.update_log("⚠️ QC 스펙 관리 탭이 이미 존재함")
+                            self.main_notebook.select(tab_id)
+                            return
+                    except tk.TclError:
+                        continue
+            
+            # QC 스펙 관리 탭 프레임 생성
+            self.qc_spec_frame = ttk.Frame(self.main_notebook)
+            self.main_notebook.add(self.qc_spec_frame, text="QC 스펙 관리")
+            
+            # 상단 제어 패널
+            control_frame = ttk.Frame(self.qc_spec_frame, style="Control.TFrame")
+            control_frame.pack(fill=tk.X, padx=15, pady=10)
+            
+            # QC 스펙 관리 섹션
+            spec_frame = ttk.LabelFrame(control_frame, text="QC Spec Master Management", padding=12)
+            spec_frame.pack(fill=tk.X, pady=(0, 8))
+            
+            # 버튼 행
+            buttons_frame = ttk.Frame(spec_frame)
+            buttons_frame.pack(fill=tk.X)
+            
+            # 버튼들
+            add_spec_btn = ttk.Button(buttons_frame, text="➕ Add QC Spec", 
+                                     command=self.add_qc_spec_dialog, width=15)
+            add_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
+            
+            edit_spec_btn = ttk.Button(buttons_frame, text="✏️ Edit Selected", 
+                                      command=self.edit_qc_spec_dialog, width=15)
+            edit_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
+            
+            delete_spec_btn = ttk.Button(buttons_frame, text="🗑️ Delete Selected", 
+                                        command=self.delete_selected_qc_specs, width=15)
+            delete_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
+            
+            import_btn = ttk.Button(buttons_frame, text="📥 Import CSV", 
+                                  command=self.import_qc_specs_csv, width=15)
+            import_btn.pack(side=tk.LEFT, padx=(0, 6))
+            
+            export_btn = ttk.Button(buttons_frame, text="📤 Export CSV", 
+                                  command=self.export_qc_specs_csv, width=15)
+            export_btn.pack(side=tk.LEFT)
+            
+            # 검색 패널
+            search_frame = ttk.Frame(spec_frame)
+            search_frame.pack(fill=tk.X, pady=(10, 0))
+            
+            ttk.Label(search_frame, text="🔎 Search:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
+            self.qc_spec_search_var = tk.StringVar()
+            self.qc_spec_search_var.trace('w', lambda *args: self.filter_qc_specs())
+            search_entry = ttk.Entry(search_frame, textvariable=self.qc_spec_search_var, width=40)
+            search_entry.pack(side=tk.LEFT, padx=(0, 10))
+            
+            clear_btn = ttk.Button(search_frame, text="Clear", 
+                                 command=lambda: self.qc_spec_search_var.set(""))
+            clear_btn.pack(side=tk.LEFT)
+            
+            # QC 스펙 목록 트리뷰
+            tree_container = ttk.LabelFrame(self.qc_spec_frame, text="QC Spec Master List", padding=10)
+            tree_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 8))
+            
+            tree_frame = ttk.Frame(tree_container)
+            tree_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 트리뷰 컬럼 정의
+            columns = ("no", "item_name", "min_spec", "max_spec", "unit", 
+                      "category", "priority", "description", "created_date", "modified_date")
+            
+            self.qc_spec_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+            
+            # 컬럼 헤더 설정
+            headers = {
+                "no": "No.",
+                "item_name": "Item Name",
+                "min_spec": "Min Spec",
+                "max_spec": "Max Spec",
+                "unit": "Unit",
+                "category": "Category",
+                "priority": "Priority",
+                "description": "Description",
+                "created_date": "Created",
+                "modified_date": "Modified"
+            }
+            
+            # 컬럼 너비
+            column_widths = {
+                "no": 50,
+                "item_name": 200,
+                "min_spec": 100,
+                "max_spec": 100,
+                "unit": 80,
+                "category": 120,
+                "priority": 80,
+                "description": 200,
+                "created_date": 100,
+                "modified_date": 100
+            }
+            
+            for col in columns:
+                self.qc_spec_tree.heading(col, text=headers[col])
+                self.qc_spec_tree.column(col, width=column_widths[col], minwidth=50)
+            
+            # 스크롤바 추가
+            v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.qc_spec_tree.yview)
+            self.qc_spec_tree.configure(yscrollcommand=v_scrollbar.set)
+            
+            h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.qc_spec_tree.xview)
+            self.qc_spec_tree.configure(xscrollcommand=h_scrollbar.set)
+            
+            # 배치
+            self.qc_spec_tree.grid(row=0, column=0, sticky="nsew")
+            v_scrollbar.grid(row=0, column=1, sticky="ns")
+            h_scrollbar.grid(row=1, column=0, sticky="ew")
+            
+            tree_frame.grid_rowconfigure(0, weight=1)
+            tree_frame.grid_columnconfigure(0, weight=1)
+            
+            # 더블클릭으로 편집
+            self.qc_spec_tree.bind("<Double-1>", lambda e: self.edit_qc_spec_dialog())
+            
+            # 상태 표시줄
+            status_container = ttk.LabelFrame(self.qc_spec_frame, text="Status", padding=10)
+            status_container.pack(fill=tk.X, padx=15, pady=(0, 8))
+            
+            self.qc_spec_status_label = ttk.Label(status_container, 
+                                                 text="Loading QC specs...", 
+                                                 font=("Segoe UI", 9))
+            self.qc_spec_status_label.pack(side=tk.LEFT)
+            
+            # 초기 데이터 로드
+            self.load_qc_specs()
+            
+            self.update_log("✅ QC 스펙 관리 탭 생성 완료")
+            
+        except Exception as e:
+            self.update_log(f"❌ QC 스펙 관리 탭 생성 오류: {e}")
             import traceback
             traceback.print_exc()
 
@@ -3195,6 +3446,133 @@ class DBManager:
         
         # 🆕 동기화 상태 확인
         self.update_log("🎯 전체 장비 유형 동기화 완료!")
+
+    def on_configuration_changed(self, event=None):
+        """신규 3-엘리먼트 구성이 변경되었을 때 호출"""
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        try:
+            # 현재 선택된 값들 가져오기
+            ae_type = self.ae_type_var.get()
+            cabinet_type = self.cabinet_type_var.get()
+            efem_type = self.efem_type_var.get()
+            
+            # Cabinet '없음'은 None으로 처리
+            if cabinet_type == '없음':
+                cabinet_type = None
+            
+            # 모든 값이 선택되었는지 확인
+            if not ae_type or not efem_type:
+                self.config_code_label.config(text="Code: -")
+                return
+            
+            # Configuration Code 생성 및 표시
+            if hasattr(self, 'selected_equipment_type_id') and self.selected_equipment_type_id:
+                config_code = self.default_db_service._generate_config_code(
+                    self.selected_equipment_type_id, ae_type, cabinet_type, efem_type
+                )
+                self.config_code_label.config(text=f"Code: {config_code}")
+                
+                # 해당 구성의 파라미터 로드
+                self.load_configuration_parameters()
+        except Exception as e:
+            self.update_log(f"❌ 구성 변경 오류: {e}")
+    
+    def open_advanced_config_dialog(self):
+        """고급 구성 옵션 다이얼로그 열기"""
+        if not USE_NEW_DB_SYSTEM:
+            messagebox.showinfo("Info", "Advanced configuration is only available in the new system.")
+            return
+            
+        try:
+            # DefaultDBConfigDialog 사용
+            dialog = DefaultDBConfigDialog(self.window, self.default_db_service)
+            
+            # 현재 선택된 장비 정보 전달
+            if hasattr(self, 'selected_equipment_type_id') and self.selected_equipment_type_id:
+                # 다이얼로그 실행
+                result = dialog.show(
+                    model_id=self.selected_equipment_type_id,
+                    ae_type=self.ae_type_var.get(),
+                    cabinet_type=self.cabinet_type_var.get() if self.cabinet_type_var.get() != '없음' else None,
+                    efem_type=self.efem_type_var.get()
+                )
+                
+                if result:
+                    # 선택된 구성 적용
+                    self.ae_type_var.set(result['ae_type'])
+                    self.cabinet_type_var.set(result['cabinet_type'] if result['cabinet_type'] else '없음')
+                    self.efem_type_var.set(result['efem_type'])
+                    self.on_configuration_changed()
+                    
+        except Exception as e:
+            self.update_log(f"❌ 고급 구성 다이얼로그 오류: {e}")
+            messagebox.showerror("Error", f"Failed to open advanced configuration: {e}")
+    
+    def load_configuration_parameters(self):
+        """선택된 구성의 파라미터 로드 (신규 시스템)"""
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        try:
+            # 구성 정보 가져오기
+            ae_type = self.ae_type_var.get()
+            cabinet_type = self.cabinet_type_var.get()
+            efem_type = self.efem_type_var.get()
+            
+            if cabinet_type == '없음':
+                cabinet_type = None
+                
+            if not ae_type or not efem_type or not self.selected_equipment_type_id:
+                return
+                
+            # 구성 ID 가져오기 또는 생성
+            config_id = self.default_db_service.get_or_create_configuration(
+                model_id=self.selected_equipment_type_id,
+                ae_type=ae_type,
+                cabinet_type=cabinet_type,
+                efem_type=efem_type
+            )
+            
+            # 파라미터 로드
+            parameters = self.default_db_service.get_configuration_parameters(config_id)
+            
+            # 트리뷰에 표시
+            self.update_default_db_tree_new(parameters)
+            
+            # 상태 업데이트
+            self.default_db_status_label.config(
+                text=f"Configuration loaded: {len(parameters)} parameters"
+            )
+            
+        except Exception as e:
+            self.update_log(f"❌ 파라미터 로드 오류: {e}")
+    
+    def update_default_db_tree_new(self, parameters):
+        """신규 시스템용 트리뷰 업데이트"""
+        try:
+            # 기존 항목 삭제
+            for item in self.default_db_tree.get_children():
+                self.default_db_tree.delete(item)
+            
+            # 새 항목 추가
+            for idx, param in enumerate(parameters, 1):
+                values = (
+                    idx,
+                    param.get('parameter_name', ''),
+                    param.get('config_code', ''),
+                    param.get('module', ''),
+                    param.get('part', ''),
+                    param.get('item_type', ''),
+                    param.get('default_value', ''),
+                    param.get('unit', ''),
+                    param.get('description', '')
+                )
+                self.default_db_tree.insert("", "end", values=values)
+                
+        except Exception as e:
+            self.update_log(f"❌ 트리뷰 업데이트 오류: {e}")
 
     def on_equipment_type_selected(self, event=None):
         """장비 유형이 선택되었을 때 호출됩니다."""
@@ -5352,8 +5730,274 @@ class DBManager:
             
         except Exception as e:
             self.update_log(f"❌ Filter Reset Error: {e}")
-
-
+    # 🆕 QC 스펙 관리 메서드들
+    def load_qc_specs(self):
+        """
+        QC 스펙 목록 로드
+        """
+        if not USE_NEW_DB_SYSTEM or not hasattr(self, 'qc_spec_service'):
+            return
+            
+        try:
+            # QC 스펙 목록 가져오기
+            specs = self.qc_spec_service.get_all_specs()
+            
+            # 트리뷰 초기화
+            for item in self.qc_spec_tree.get_children():
+                self.qc_spec_tree.delete(item)
+            
+            # 스펙 추가
+            for idx, spec in enumerate(specs, 1):
+                values = (
+                    idx,
+                    spec.get('item_name', ''),
+                    spec.get('min_spec', ''),
+                    spec.get('max_spec', ''),
+                    spec.get('unit', ''),
+                    spec.get('category', ''),
+                    spec.get('priority', 'normal'),
+                    spec.get('description', ''),
+                    spec.get('created_date', ''),
+                    spec.get('modified_date', '')
+                )
+                self.qc_spec_tree.insert("", "end", values=values, tags=(spec.get('id'),))
+            
+            # 상태 업데이트
+            self.qc_spec_status_label.config(
+                text=f"Total {len(specs)} QC specs loaded"
+            )
+            
+            self.update_log(f"✅ QC 스펙 {len(specs)}개 로드 완료")
+            
+        except Exception as e:
+            self.update_log(f"❌ QC 스펙 로드 오류: {e}")
+    
+    def filter_qc_specs(self):
+        """
+        QC 스펙 필터링
+        """
+        if not hasattr(self, 'qc_spec_tree'):
+            return
+            
+        try:
+            search_text = self.qc_spec_search_var.get().lower()
+            
+            # 모든 항목 보이기/숨기기
+            for item in self.qc_spec_tree.get_children():
+                values = self.qc_spec_tree.item(item)['values']
+                # Item Name, Category, Description에서 검색
+                item_name = str(values[1]).lower()
+                category = str(values[5]).lower()
+                description = str(values[7]).lower()
+                
+                if search_text in item_name or search_text in category or search_text in description:
+                    self.qc_spec_tree.item(item, tags=('visible',))
+                else:
+                    self.qc_spec_tree.detach(item)
+                    
+        except Exception as e:
+            self.update_log(f"❌ QC 스펙 필터링 오류: {e}")
+    
+    def add_qc_spec_dialog(self):
+        """
+        QC 스펙 추가 다이얼로그
+        """
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        try:
+            dialog = tk.Toplevel(self.window)
+            dialog.title("Add QC Spec")
+            dialog.geometry("500x400")
+            center_dialog(dialog)
+            
+            # 입력 필드들
+            fields = {
+                'Item Name': tk.StringVar(),
+                'Min Spec': tk.StringVar(),
+                'Max Spec': tk.StringVar(),
+                'Unit': tk.StringVar(),
+                'Category': tk.StringVar(),
+                'Priority': tk.StringVar(value='normal'),
+                'Description': tk.Text
+            }
+            
+            # 필드 생성
+            for idx, (label, var) in enumerate(fields.items()):
+                ttk.Label(dialog, text=f"{label}:").grid(row=idx, column=0, sticky='e', padx=5, pady=5)
+                
+                if label == 'Priority':
+                    combo = ttk.Combobox(dialog, textvariable=var, 
+                                        values=['low', 'normal', 'high', 'critical'],
+                                        state='readonly', width=30)
+                    combo.grid(row=idx, column=1, padx=5, pady=5)
+                elif label == 'Description':
+                    text_widget = tk.Text(dialog, width=40, height=5)
+                    text_widget.grid(row=idx, column=1, padx=5, pady=5)
+                    fields[label] = text_widget
+                else:
+                    entry = ttk.Entry(dialog, textvariable=var, width=32)
+                    entry.grid(row=idx, column=1, padx=5, pady=5)
+            
+            # 버튼들
+            button_frame = ttk.Frame(dialog)
+            button_frame.grid(row=len(fields), column=0, columnspan=2, pady=20)
+            
+            def save_spec():
+                try:
+                    # 새 스펙 데이터 수집
+                    spec_data = {
+                        'item_name': fields['Item Name'].get(),
+                        'min_spec': fields['Min Spec'].get() or None,
+                        'max_spec': fields['Max Spec'].get() or None,
+                        'unit': fields['Unit'].get(),
+                        'category': fields['Category'].get(),
+                        'priority': fields['Priority'].get(),
+                        'description': fields['Description'].get('1.0', 'end-1c')
+                    }
+                    
+                    # 필수 필드 검증
+                    if not spec_data['item_name']:
+                        messagebox.showerror("Error", "Item Name is required")
+                        return
+                    
+                    # 스펙 추가
+                    self.qc_spec_service.add_spec(**spec_data)
+                    
+                    # 목록 새로고침
+                    self.load_qc_specs()
+                    
+                    messagebox.showinfo("Success", "QC Spec added successfully")
+                    dialog.destroy()
+                    
+                except Exception as e:
+                    messagebox.showerror("Error", f"Failed to add QC spec: {e}")
+            
+            ttk.Button(button_frame, text="Save", command=save_spec).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="Cancel", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+            
+        except Exception as e:
+            self.update_log(f"❌ QC 스펙 추가 다이얼로그 오류: {e}")
+    
+    def edit_qc_spec_dialog(self):
+        """
+        QC 스펙 편집 다이얼로그
+        """
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        selected = self.qc_spec_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select a QC spec to edit")
+            return
+            
+        # 선택된 항목의 ID 가져오기
+        item = selected[0]
+        spec_id = self.qc_spec_tree.item(item, 'tags')[0]
+        values = self.qc_spec_tree.item(item, 'values')
+        
+        # 편집 다이얼로그 (추가와 유사, spec_id를 전달하고 update 호출)
+        # ... 생략 (add_qc_spec_dialog와 유사한 구조)
+        
+    def delete_selected_qc_specs(self):
+        """
+        선택된 QC 스펙 삭제
+        """
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        selected = self.qc_spec_tree.selection()
+        if not selected:
+            messagebox.showwarning("Warning", "Please select QC specs to delete")
+            return
+            
+        if messagebox.askyesno("Confirm", f"Delete {len(selected)} selected QC spec(s)?"):
+            try:
+                for item in selected:
+                    spec_id = self.qc_spec_tree.item(item, 'tags')[0]
+                    self.qc_spec_service.delete_spec(spec_id)
+                
+                self.load_qc_specs()
+                messagebox.showinfo("Success", f"{len(selected)} QC spec(s) deleted")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to delete QC specs: {e}")
+    
+    def import_qc_specs_csv(self):
+        """
+        CSV에서 QC 스펙 가져오기
+        """
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        filename = filedialog.askopenfilename(
+            title="Select CSV file",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                import csv
+                with open(filename, 'r', encoding='utf-8') as file:
+                    reader = csv.DictReader(file)
+                    count = 0
+                    for row in reader:
+                        self.qc_spec_service.add_spec(
+                            item_name=row.get('item_name', ''),
+                            min_spec=row.get('min_spec') or None,
+                            max_spec=row.get('max_spec') or None,
+                            unit=row.get('unit', ''),
+                            category=row.get('category', ''),
+                            priority=row.get('priority', 'normal'),
+                            description=row.get('description', '')
+                        )
+                        count += 1
+                
+                self.load_qc_specs()
+                messagebox.showinfo("Success", f"Imported {count} QC specs")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to import CSV: {e}")
+    
+    def export_qc_specs_csv(self):
+        """
+        QC 스펙을 CSV로 내보내기
+        """
+        if not USE_NEW_DB_SYSTEM:
+            return
+            
+        filename = filedialog.asksaveasfilename(
+            title="Save CSV file",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filename:
+            try:
+                specs = self.qc_spec_service.get_all_specs()
+                
+                import csv
+                with open(filename, 'w', newline='', encoding='utf-8') as file:
+                    fieldnames = ['item_name', 'min_spec', 'max_spec', 'unit', 
+                                'category', 'priority', 'description']
+                    writer = csv.DictWriter(file, fieldnames=fieldnames)
+                    
+                    writer.writeheader()
+                    for spec in specs:
+                        writer.writerow({
+                            'item_name': spec.get('item_name', ''),
+                            'min_spec': spec.get('min_spec', ''),
+                            'max_spec': spec.get('max_spec', ''),
+                            'unit': spec.get('unit', ''),
+                            'category': spec.get('category', ''),
+                            'priority': spec.get('priority', ''),
+                            'description': spec.get('description', '')
+                        })
+                
+                messagebox.showinfo("Success", f"Exported {len(specs)} QC specs to {filename}")
+                
+            except Exception as e:
+                messagebox.showerror("Error", f"Failed to export CSV: {e}")
 
 
 
