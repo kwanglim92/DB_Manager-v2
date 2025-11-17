@@ -3013,12 +3013,9 @@ class DBManager:
             traceback.print_exc()
     
     def create_qc_spec_management_tab(self):
-        """🆕 QC 스펙 관리 탭 생성 (신규 시스템)"""
-        if not USE_NEW_DB_SYSTEM:
-            return
-            
+        """🆕 QC 스펙 관리 탭 생성 (Custom Config 기반)"""
         try:
-            self.update_log("🌟 QC 스펙 관리 탭 생성 시작...")
+            self.update_log("🌟 Custom QC 스펙 관리 탭 생성 시작...")
             
             # 기존 탭 중복 검사
             if hasattr(self, 'main_notebook') and self.main_notebook:
@@ -3032,71 +3029,106 @@ class DBManager:
                     except tk.TclError:
                         continue
             
+            # Custom QC Config 초기화
+            if not hasattr(self, 'custom_qc_config'):
+                from app.qc_custom_config import CustomQCConfig
+                self.custom_qc_config = CustomQCConfig(config_path="config/qc_custom_config.json")
+            
             # QC 스펙 관리 탭 프레임 생성
             self.qc_spec_frame = ttk.Frame(self.main_notebook)
             self.main_notebook.add(self.qc_spec_frame, text="QC 스펙 관리")
             
-            # 상단 제어 패널
-            control_frame = ttk.Frame(self.qc_spec_frame, style="Control.TFrame")
-            control_frame.pack(fill=tk.X, padx=15, pady=10)
+            # ============================================
+            # 1. Equipment Type 선택 영역 (토글 방식)
+            # ============================================
+            type_selection_frame = ttk.LabelFrame(
+                self.qc_spec_frame, 
+                text="Equipment Type 선택", 
+                padding=15
+            )
+            type_selection_frame.pack(fill=tk.X, padx=15, pady=10)
             
-            # QC 스펙 관리 섹션
-            spec_frame = ttk.LabelFrame(control_frame, text="QC Spec Master Management", padding=12)
-            spec_frame.pack(fill=tk.X, pady=(0, 8))
+            # Equipment Type 라디오버튼 영역
+            self.equipment_type_radio_frame = ttk.Frame(type_selection_frame)
+            self.equipment_type_radio_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            # Equipment Type 선택 변수
+            self.selected_equipment_type = tk.StringVar()
+            
+            # Equipment Types 로드 및 라디오버튼 생성
+            self.equipment_type_radios = []
+            
+            # Equipment Type 관리 버튼
+            button_frame = ttk.Frame(type_selection_frame)
+            button_frame.pack(fill=tk.X)
+            
+            ttk.Button(button_frame, text="➕ 새 Type 추가", 
+                      command=self.add_equipment_type_dialog).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="✏️ Type 이름 변경", 
+                      command=self.rename_equipment_type_dialog).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="🗑️ Type 삭제", 
+                      command=self.delete_equipment_type_dialog).pack(side=tk.LEFT, padx=5)
+            
+            # ============================================
+            # 2. QC Spec Master Management
+            # ============================================
+            management_frame = ttk.LabelFrame(
+                self.qc_spec_frame, 
+                text="QC Spec Master Management", 
+                padding=12
+            )
+            management_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
             
             # 버튼 행
-            buttons_frame = ttk.Frame(spec_frame)
+            buttons_frame = ttk.Frame(management_frame)
             buttons_frame.pack(fill=tk.X)
             
-            # 버튼들
-            add_spec_btn = ttk.Button(buttons_frame, text="➕ Add QC Spec", 
-                                     command=self.add_qc_spec_dialog, width=15)
-            add_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
-            
-            edit_spec_btn = ttk.Button(buttons_frame, text="✏️ Edit Selected", 
-                                      command=self.edit_qc_spec_dialog, width=15)
-            edit_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
-            
-            delete_spec_btn = ttk.Button(buttons_frame, text="🗑️ Delete Selected", 
-                                        command=self.delete_selected_qc_specs, width=15)
-            delete_spec_btn.pack(side=tk.LEFT, padx=(0, 6))
-            
-            import_btn = ttk.Button(buttons_frame, text="📥 Import CSV", 
-                                  command=self.import_qc_specs_csv, width=15)
-            import_btn.pack(side=tk.LEFT, padx=(0, 6))
-            
-            export_btn = ttk.Button(buttons_frame, text="📤 Export CSV", 
-                                  command=self.export_qc_specs_csv, width=15)
-            export_btn.pack(side=tk.LEFT)
+            ttk.Button(buttons_frame, text="➕ Add QC Spec", 
+                      command=self.add_qc_spec_dialog, width=15).pack(side=tk.LEFT, padx=6)
+            ttk.Button(buttons_frame, text="✏️ Edit Selected", 
+                      command=self.edit_qc_spec_dialog, width=15).pack(side=tk.LEFT, padx=6)
+            ttk.Button(buttons_frame, text="🗑️ Delete Selected", 
+                      command=self.delete_selected_qc_specs, width=15).pack(side=tk.LEFT, padx=6)
+            ttk.Button(buttons_frame, text="📥 Import CSV", 
+                      command=self.import_qc_specs_csv, width=15).pack(side=tk.LEFT, padx=6)
+            ttk.Button(buttons_frame, text="📤 Export CSV", 
+                      command=self.export_qc_specs_csv, width=15).pack(side=tk.LEFT)
             
             # 검색 패널
-            search_frame = ttk.Frame(spec_frame)
+            search_frame = ttk.Frame(management_frame)
             search_frame.pack(fill=tk.X, pady=(10, 0))
             
-            ttk.Label(search_frame, text="🔎 Search:", font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
+            ttk.Label(search_frame, text="🔎 Search:", 
+                     font=("Segoe UI", 9)).pack(side=tk.LEFT, padx=(0, 5))
             self.qc_spec_search_var = tk.StringVar()
             self.qc_spec_search_var.trace('w', lambda *args: self.filter_qc_specs())
-            search_entry = ttk.Entry(search_frame, textvariable=self.qc_spec_search_var, width=40)
+            search_entry = ttk.Entry(search_frame, 
+                                    textvariable=self.qc_spec_search_var, width=40)
             search_entry.pack(side=tk.LEFT, padx=(0, 10))
+            ttk.Button(search_frame, text="Clear", 
+                      command=lambda: self.qc_spec_search_var.set("")).pack(side=tk.LEFT)
             
-            clear_btn = ttk.Button(search_frame, text="Clear", 
-                                 command=lambda: self.qc_spec_search_var.set(""))
-            clear_btn.pack(side=tk.LEFT)
-            
-            # QC 스펙 목록 트리뷰
-            tree_container = ttk.LabelFrame(self.qc_spec_frame, text="QC Spec Master List", padding=10)
+            # ============================================
+            # 3. QC Spec Master List (트리뷰)
+            # ============================================
+            tree_container = ttk.LabelFrame(
+                self.qc_spec_frame, 
+                text="QC Spec Master List", 
+                padding=10
+            )
             tree_container.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 8))
             
             tree_frame = ttk.Frame(tree_container)
             tree_frame.pack(fill=tk.BOTH, expand=True)
             
-            # 트리뷰 컬럼 정의
+            # 트리뷰 컬럼 정의 (이미지와 동일)
             columns = ("no", "item_name", "min_spec", "max_spec", "unit", 
                       "category", "priority", "description", "created_date", "modified_date")
             
-            self.qc_spec_tree = ttk.Treeview(tree_frame, columns=columns, show="headings", height=20)
+            self.qc_spec_tree = ttk.Treeview(tree_frame, columns=columns, 
+                                             show="headings", height=20)
             
-            # 컬럼 헤더 설정
+            # 컬럼 헤더 및 너비
             headers = {
                 "no": "No.",
                 "item_name": "Item Name",
@@ -3110,30 +3142,23 @@ class DBManager:
                 "modified_date": "Modified"
             }
             
-            # 컬럼 너비
-            column_widths = {
-                "no": 50,
-                "item_name": 200,
-                "min_spec": 100,
-                "max_spec": 100,
-                "unit": 80,
-                "category": 120,
-                "priority": 80,
-                "description": 200,
-                "created_date": 100,
-                "modified_date": 100
+            widths = {
+                "no": 50, "item_name": 200, "min_spec": 100, "max_spec": 100,
+                "unit": 80, "category": 120, "priority": 80, "description": 200,
+                "created_date": 100, "modified_date": 100
             }
             
             for col in columns:
                 self.qc_spec_tree.heading(col, text=headers[col])
-                self.qc_spec_tree.column(col, width=column_widths[col], minwidth=50)
+                self.qc_spec_tree.column(col, width=widths[col], minwidth=50)
             
-            # 스크롤바 추가
-            v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", command=self.qc_spec_tree.yview)
-            self.qc_spec_tree.configure(yscrollcommand=v_scrollbar.set)
-            
-            h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", command=self.qc_spec_tree.xview)
-            self.qc_spec_tree.configure(xscrollcommand=h_scrollbar.set)
+            # 스크롤바
+            v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", 
+                                        command=self.qc_spec_tree.yview)
+            h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", 
+                                        command=self.qc_spec_tree.xview)
+            self.qc_spec_tree.configure(yscrollcommand=v_scrollbar.set, 
+                                        xscrollcommand=h_scrollbar.set)
             
             # 배치
             self.qc_spec_tree.grid(row=0, column=0, sticky="nsew")
@@ -3146,19 +3171,23 @@ class DBManager:
             # 더블클릭으로 편집
             self.qc_spec_tree.bind("<Double-1>", lambda e: self.edit_qc_spec_dialog())
             
-            # 상태 표시줄
+            # ============================================
+            # 4. 상태 표시줄
+            # ============================================
             status_container = ttk.LabelFrame(self.qc_spec_frame, text="Status", padding=10)
             status_container.pack(fill=tk.X, padx=15, pady=(0, 8))
             
-            self.qc_spec_status_label = ttk.Label(status_container, 
-                                                 text="Loading QC specs...", 
-                                                 font=("Segoe UI", 9))
+            self.qc_spec_status_label = ttk.Label(
+                status_container, 
+                text="Loading QC specs...", 
+                font=("Segoe UI", 9)
+            )
             self.qc_spec_status_label.pack(side=tk.LEFT)
             
-            # 초기 데이터 로드
-            self.load_qc_specs()
+            # 초기 로드
+            self.refresh_equipment_type_radios()
             
-            self.update_log("✅ QC 스펙 관리 탭 생성 완료")
+            self.update_log("✅ Custom QC 스펙 관리 탭 생성 완료")
             
         except Exception as e:
             self.update_log(f"❌ QC 스펙 관리 탭 생성 오류: {e}")
@@ -5998,8 +6027,841 @@ class DBManager:
                 
             except Exception as e:
                 messagebox.showerror("Error", f"Failed to export CSV: {e}")
-
-
+    
+    # ====================================================================
+    # Custom QC Configuration 관련 메서드들
+    # ====================================================================
+    
+    def refresh_equipment_type_radios(self):
+        """Equipment Type 라디오버튼 새로고침"""
+        # 기존 라디오버튼 제거
+        for widget in self.equipment_type_radios:
+            widget.destroy()
+        self.equipment_type_radios.clear()
+        
+        # Equipment Types 로드
+        types = self.custom_qc_config.get_equipment_types()
+        
+        if not types:
+            # 기본 타입이 없으면 추가
+            self.custom_qc_config.add_equipment_type("Standard Model")
+            self.custom_qc_config.save_config()
+            types = self.custom_qc_config.get_equipment_types()
+        
+        # 라디오버튼 생성
+        for eq_type in types:
+            radio = ttk.Radiobutton(
+                self.equipment_type_radio_frame, 
+                text=eq_type, 
+                variable=self.selected_equipment_type, 
+                value=eq_type,
+                command=self.load_qc_specs_for_selected_type
+            )
+            radio.pack(side=tk.LEFT, padx=10)
+            self.equipment_type_radios.append(radio)
+        
+        # 첫 번째 타입 선택
+        if types:
+            self.selected_equipment_type.set(types[0])
+            self.load_qc_specs_for_selected_type()
+    
+    def load_qc_specs_for_selected_type(self):
+        """선택된 Equipment Type의 QC 스펙 로드"""
+        equipment_type = self.selected_equipment_type.get()
+        
+        if not equipment_type:
+            return
+        
+        # 트리뷰 초기화
+        for item in self.qc_spec_tree.get_children():
+            self.qc_spec_tree.delete(item)
+        
+        # 스펙 로드
+        specs = self.custom_qc_config.get_specs(equipment_type)
+        
+        if not specs:
+            self.qc_spec_status_label.config(
+                text=f"'{equipment_type}' - 등록된 QC 스펙이 없습니다."
+            )
+            return
+        
+        # 트리뷰에 표시
+        for idx, spec in enumerate(specs, 1):
+            self.qc_spec_tree.insert('', 'end', values=(
+                idx,
+                spec['item_name'],
+                spec['min_spec'],
+                spec['max_spec'],
+                spec.get('unit', ''),
+                equipment_type,  # Category = Equipment Type
+                'Normal',  # Priority
+                spec.get('description', ''),
+                '',  # Created date
+                ''   # Modified date
+            ))
+        
+        self.qc_spec_status_label.config(
+            text=f"'{equipment_type}' - {len(specs)}개 항목 로드됨"
+        )
+        self.update_log(f"[QC 스펙] '{equipment_type}' - {len(specs)}개 항목 로드")
+    
+    def add_equipment_type_dialog(self):
+        """새 Equipment Type 추가"""
+        new_type = simpledialog.askstring(
+            "Add Equipment Type",
+            "새 Equipment Type 이름을 입력하세요:"
+        )
+        
+        if new_type and new_type.strip():
+            success = self.custom_qc_config.add_equipment_type(new_type.strip())
+            if success:
+                self.custom_qc_config.save_config()
+                self.refresh_equipment_type_radios()
+                self.update_log(f"✅ Equipment Type 추가: {new_type}")
+                messagebox.showinfo("성공", f"'{new_type}'이(가) 추가되었습니다.")
+            else:
+                messagebox.showwarning("경고", "이미 존재하는 Equipment Type입니다.")
+    
+    def rename_equipment_type_dialog(self):
+        """선택된 Equipment Type 이름 변경"""
+        current_type = self.selected_equipment_type.get()
+        
+        if not current_type:
+            messagebox.showwarning("경고", "이름을 변경할 Equipment Type을 선택하세요.")
+            return
+        
+        new_name = simpledialog.askstring(
+            "Rename Equipment Type",
+            f"'{current_type}'의 새 이름을 입력하세요:",
+            initialvalue=current_type
+        )
+        
+        if new_name and new_name.strip() and new_name != current_type:
+            # 데이터 복사 후 삭제 방식
+            specs = self.custom_qc_config.get_specs(current_type)
+            self.custom_qc_config.add_equipment_type(new_name.strip())
+            self.custom_qc_config.update_specs(new_name.strip(), specs)
+            self.custom_qc_config.remove_equipment_type(current_type)
+            self.custom_qc_config.save_config()
+            
+            self.refresh_equipment_type_radios()
+            self.update_log(f"✅ Equipment Type 이름 변경: {current_type} → {new_name}")
+            messagebox.showinfo("성공", f"'{current_type}'이(가) '{new_name}'(으)로 변경되었습니다.")
+    
+    def delete_equipment_type_dialog(self):
+        """선택된 Equipment Type 삭제"""
+        current_type = self.selected_equipment_type.get()
+        
+        if not current_type:
+            messagebox.showwarning("경고", "삭제할 Equipment Type을 선택하세요.")
+            return
+        
+        if messagebox.askyesno("확인", 
+                              f"'{current_type}'과(와) 관련된 모든 QC 스펙이 삭제됩니다.\n"
+                              "계속하시겠습니까?"):
+            self.custom_qc_config.remove_equipment_type(current_type)
+            self.custom_qc_config.save_config()
+            self.refresh_equipment_type_radios()
+            self.update_log(f"✅ Equipment Type 삭제: {current_type}")
+            messagebox.showinfo("완료", f"'{current_type}'이(가) 삭제되었습니다.")
+    
+    def add_qc_spec_dialog(self):
+        """QC 스펙 추가 다이얼로그"""
+        equipment_type = self.selected_equipment_type.get()
+        
+        if not equipment_type:
+            messagebox.showwarning("경고", "먼저 Equipment Type을 선택하세요.")
+            return
+        
+        # 다이얼로그
+        dialog = tk.Toplevel(self.window)
+        dialog.title(f"Add QC Spec - {equipment_type}")
+        dialog.geometry("500x350")
+        dialog.transient(self.window)
+        dialog.grab_set()
+        
+        # 입력 필드
+        input_frame = ttk.Frame(dialog, padding=20)
+        input_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # Item Name
+        ttk.Label(input_frame, text="Item Name:").grid(row=0, column=0, sticky='w', pady=5)
+        item_name_var = tk.StringVar()
+        ttk.Entry(input_frame, textvariable=item_name_var, width=40).grid(
+            row=0, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        # Min Spec
+        ttk.Label(input_frame, text="Min Spec:").grid(row=1, column=0, sticky='w', pady=5)
+        min_spec_var = tk.StringVar()
+        ttk.Entry(input_frame, textvariable=min_spec_var, width=40).grid(
+            row=1, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        # Max Spec
+        ttk.Label(input_frame, text="Max Spec:").grid(row=2, column=0, sticky='w', pady=5)
+        max_spec_var = tk.StringVar()
+        ttk.Entry(input_frame, textvariable=max_spec_var, width=40).grid(
+            row=2, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        # Unit
+        ttk.Label(input_frame, text="Unit:").grid(row=3, column=0, sticky='w', pady=5)
+        unit_var = tk.StringVar()
+        ttk.Entry(input_frame, textvariable=unit_var, width=40).grid(
+            row=3, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        # Description
+        ttk.Label(input_frame, text="Description:").grid(row=4, column=0, sticky='w', pady=5)
+        desc_var = tk.StringVar()
+        ttk.Entry(input_frame, textvariable=desc_var, width=40).grid(
+            row=4, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        input_frame.grid_columnconfigure(1, weight=1)
+        
+        def save_spec():
+            if not item_name_var.get():
+                messagebox.showwarning("경고", "Item Name을 입력하세요.")
+                return
+            
+            try:
+                min_val = float(min_spec_var.get())
+                max_val = float(max_spec_var.get())
+            except ValueError:
+                messagebox.showerror("오류", "Min Spec과 Max Spec은 숫자여야 합니다.")
+                return
+            
+            if min_val > max_val:
+                messagebox.showwarning("경고", "Min Spec이 Max Spec보다 클 수 없습니다.")
+                return
+            
+            new_spec = {
+                'item_name': item_name_var.get(),
+                'min_spec': min_val,
+                'max_spec': max_val,
+                'unit': unit_var.get(),
+                'enabled': True,
+                'description': desc_var.get()
+            }
+            
+            success = self.custom_qc_config.add_spec_item(equipment_type, new_spec)
+            if success:
+                self.custom_qc_config.save_config()
+                self.load_qc_specs_for_selected_type()
+                self.update_log(f"✅ QC 스펙 추가: {equipment_type} - {item_name_var.get()}")
+                dialog.destroy()
+                messagebox.showinfo("성공", "QC 스펙이 추가되었습니다.")
+            else:
+                messagebox.showerror("오류", "QC 스펙 추가 실패")
+        
+        # 버튼
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        ttk.Button(button_frame, text="저장", command=save_spec).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="취소", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def edit_qc_spec_dialog(self):
+        """선택된 QC 스펙 편집"""
+        selected = self.qc_spec_tree.selection()
+        if not selected:
+            messagebox.showwarning("경고", "편집할 항목을 선택하세요.")
+            return
+        
+        equipment_type = self.selected_equipment_type.get()
+        item_values = self.qc_spec_tree.item(selected[0], 'values')
+        
+        # 기존 값 추출
+        old_item_name = item_values[1]
+        old_min_spec = item_values[2]
+        old_max_spec = item_values[3]
+        old_unit = item_values[4]
+        old_desc = item_values[7]
+        
+        # 편집 다이얼로그
+        dialog = tk.Toplevel(self.window)
+        dialog.title(f"Edit QC Spec - {equipment_type}")
+        dialog.geometry("500x350")
+        dialog.transient(self.window)
+        dialog.grab_set()
+        
+        input_frame = ttk.Frame(dialog, padding=20)
+        input_frame.pack(fill=tk.BOTH, expand=True)
+        
+        # 입력 필드 (기존 값으로 초기화)
+        ttk.Label(input_frame, text="Item Name:").grid(row=0, column=0, sticky='w', pady=5)
+        item_name_var = tk.StringVar(value=old_item_name)
+        ttk.Entry(input_frame, textvariable=item_name_var, width=40, 
+                 state='readonly').grid(row=0, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        ttk.Label(input_frame, text="Min Spec:").grid(row=1, column=0, sticky='w', pady=5)
+        min_spec_var = tk.StringVar(value=old_min_spec)
+        ttk.Entry(input_frame, textvariable=min_spec_var, width=40).grid(
+            row=1, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        ttk.Label(input_frame, text="Max Spec:").grid(row=2, column=0, sticky='w', pady=5)
+        max_spec_var = tk.StringVar(value=old_max_spec)
+        ttk.Entry(input_frame, textvariable=max_spec_var, width=40).grid(
+            row=2, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        ttk.Label(input_frame, text="Unit:").grid(row=3, column=0, sticky='w', pady=5)
+        unit_var = tk.StringVar(value=old_unit)
+        ttk.Entry(input_frame, textvariable=unit_var, width=40).grid(
+            row=3, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        ttk.Label(input_frame, text="Description:").grid(row=4, column=0, sticky='w', pady=5)
+        desc_var = tk.StringVar(value=old_desc)
+        ttk.Entry(input_frame, textvariable=desc_var, width=40).grid(
+            row=4, column=1, sticky='ew', pady=5, padx=(10, 0))
+        
+        input_frame.grid_columnconfigure(1, weight=1)
+        
+        def update_spec():
+            try:
+                min_val = float(min_spec_var.get())
+                max_val = float(max_spec_var.get())
+            except ValueError:
+                messagebox.showerror("오류", "Min Spec과 Max Spec은 숫자여야 합니다.")
+                return
+            
+            # 기존 항목 삭제 후 새로 추가
+            self.custom_qc_config.remove_spec_item(equipment_type, old_item_name)
+            
+            updated_spec = {
+                'item_name': old_item_name,  # Item Name은 변경 불가
+                'min_spec': min_val,
+                'max_spec': max_val,
+                'unit': unit_var.get(),
+                'enabled': True,
+                'description': desc_var.get()
+            }
+            
+            self.custom_qc_config.add_spec_item(equipment_type, updated_spec)
+            self.custom_qc_config.save_config()
+            self.load_qc_specs_for_selected_type()
+            self.update_log(f"✅ QC 스펙 수정: {equipment_type} - {old_item_name}")
+            dialog.destroy()
+            messagebox.showinfo("성공", "QC 스펙이 수정되었습니다.")
+        
+        button_frame = ttk.Frame(dialog)
+        button_frame.pack(fill=tk.X, padx=20, pady=(0, 20))
+        
+        ttk.Button(button_frame, text="저장", command=update_spec).pack(side=tk.LEFT, padx=5)
+        ttk.Button(button_frame, text="취소", command=dialog.destroy).pack(side=tk.LEFT, padx=5)
+    
+    def delete_selected_qc_specs(self):
+        """선택된 QC 스펙 삭제"""
+        selected = self.qc_spec_tree.selection()
+        if not selected:
+            messagebox.showwarning("경고", "삭제할 항목을 선택하세요.")
+            return
+        
+        equipment_type = self.selected_equipment_type.get()
+        
+        if messagebox.askyesno("확인", f"{len(selected)}개 항목을 삭제하시겠습니까?"):
+            for item in selected:
+                item_name = self.qc_spec_tree.item(item, 'values')[1]
+                self.custom_qc_config.remove_spec_item(equipment_type, item_name)
+            
+            self.custom_qc_config.save_config()
+            self.load_qc_specs_for_selected_type()
+            self.update_log(f"✅ {len(selected)}개 QC 스펙 삭제: {equipment_type}")
+            messagebox.showinfo("완료", f"{len(selected)}개 항목이 삭제되었습니다.")
+    
+    def filter_qc_specs(self):
+        """검색 필터 적용"""
+        search_text = self.qc_spec_search_var.get().lower()
+        
+        if not search_text:
+            # 검색어가 없으면 전체 표시
+            self.load_qc_specs_for_selected_type()
+            return
+        
+        # 현재 표시된 항목 필터링
+        equipment_type = self.selected_equipment_type.get()
+        specs = self.custom_qc_config.get_specs(equipment_type)
+        
+        # 트리뷰 초기화
+        for item in self.qc_spec_tree.get_children():
+            self.qc_spec_tree.delete(item)
+        
+        # 필터링된 항목만 표시
+        filtered_count = 0
+        for idx, spec in enumerate(specs, 1):
+            if search_text in spec['item_name'].lower() or \
+               search_text in spec.get('description', '').lower():
+                self.qc_spec_tree.insert('', 'end', values=(
+                    idx,
+                    spec['item_name'],
+                    spec['min_spec'],
+                    spec['max_spec'],
+                    spec.get('unit', ''),
+                    equipment_type,
+                    'Normal',
+                    spec.get('description', ''),
+                    '',
+                    ''
+                ))
+                filtered_count += 1
+        
+        self.qc_spec_status_label.config(
+            text=f"'{equipment_type}' - 검색 결과: {filtered_count}개"
+        )
+    
+    def import_qc_specs_csv(self):
+        """CSV에서 QC 스펙 가져오기"""
+        equipment_type = self.selected_equipment_type.get()
+        
+        if not equipment_type:
+            messagebox.showwarning("경고", "먼저 Equipment Type을 선택하세요.")
+            return
+        
+        filepath = filedialog.askopenfilename(
+            title="Import QC Specs",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filepath:
+            try:
+                import pandas as pd
+                df = pd.read_csv(filepath)
+                
+                # 필수 컬럼 확인
+                required_cols = ['Item Name', 'Min Spec', 'Max Spec']
+                if not all(col in df.columns for col in required_cols):
+                    messagebox.showerror("오류", 
+                        f"CSV 파일에 필수 컬럼이 없습니다.\n"
+                        f"필요한 컬럼: {', '.join(required_cols)}")
+                    return
+                
+                # 데이터 추가
+                added_count = 0
+                for _, row in df.iterrows():
+                    spec = {
+                        'item_name': str(row['Item Name']),
+                        'min_spec': float(row['Min Spec']),
+                        'max_spec': float(row['Max Spec']),
+                        'unit': str(row.get('Unit', '')),
+                        'enabled': True,
+                        'description': str(row.get('Description', ''))
+                    }
+                    
+                    if self.custom_qc_config.add_spec_item(equipment_type, spec):
+                        added_count += 1
+                
+                self.custom_qc_config.save_config()
+                self.load_qc_specs_for_selected_type()
+                self.update_log(f"✅ CSV Import: {added_count}개 항목 추가")
+                messagebox.showinfo("완료", f"{added_count}개 항목이 추가되었습니다.")
+                
+            except Exception as e:
+                messagebox.showerror("오류", f"CSV 가져오기 실패:\n{str(e)}")
+    
+    def export_qc_specs_csv(self):
+        """QC 스펙을 CSV로 내보내기"""
+        equipment_type = self.selected_equipment_type.get()
+        
+        if not equipment_type:
+            messagebox.showwarning("경고", "먼저 Equipment Type을 선택하세요.")
+            return
+        
+        specs = self.custom_qc_config.get_specs(equipment_type)
+        
+        if not specs:
+            messagebox.showwarning("경고", "내보낼 QC 스펙이 없습니다.")
+            return
+        
+        filepath = filedialog.asksaveasfilename(
+            title="Export QC Specs",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("All files", "*.*")]
+        )
+        
+        if filepath:
+            try:
+                import pandas as pd
+                
+                # DataFrame 생성
+                data = []
+                for spec in specs:
+                    data.append({
+                        'Item Name': spec['item_name'],
+                        'Min Spec': spec['min_spec'],
+                        'Max Spec': spec['max_spec'],
+                        'Unit': spec.get('unit', ''),
+                        'Description': spec.get('description', ''),
+                        'Category': equipment_type
+                    })
+                
+                df = pd.DataFrame(data)
+                df.to_csv(filepath, index=False, encoding='utf-8-sig')
+                
+                self.update_log(f"✅ CSV Export: {len(specs)}개 항목 저장")
+                messagebox.showinfo("완료", f"QC 스펙이 저장되었습니다:\n{filepath}")
+                
+            except Exception as e:
+                messagebox.showerror("오류", f"CSV 내보내기 실패:\n{str(e)}")
+    
+    def create_custom_qc_inspection_tab(self):
+        """QC 검수 탭 생성 - Custom Config 기반"""
+        try:
+            self.update_log("🔍 Custom QC 검수 탭 생성 시작...")
+            
+            # 기존 탭 중복 검사
+            if hasattr(self, 'main_notebook') and self.main_notebook:
+                for tab_id in range(self.main_notebook.index('end')):
+                    try:
+                        tab_text = self.main_notebook.tab(tab_id, 'text')
+                        if "QC 검수" in tab_text and "Custom" not in tab_text:
+                            # 기존 QC 검수 탭이 있으면 일단 스킵
+                            pass
+                    except tk.TclError:
+                        continue
+            
+            # Custom QC Config 초기화 확인
+            if not hasattr(self, 'custom_qc_config'):
+                from app.qc_custom_config import CustomQCConfig
+                self.custom_qc_config = CustomQCConfig(config_path="config/qc_custom_config.json")
+            
+            qc_tab = ttk.Frame(self.main_notebook)
+            self.main_notebook.add(qc_tab, text="🔍 QC 검수 (Custom)")
+            
+            # ============================================
+            # 1. Equipment Type 선택 (토글 방식)
+            # ============================================
+            type_frame = ttk.LabelFrame(qc_tab, text="Equipment Type 선택", padding=12)
+            type_frame.pack(fill=tk.X, padx=15, pady=10)
+            
+            # Equipment Type 라디오버튼 영역
+            self.qc_equipment_type_radio_frame = ttk.Frame(type_frame)
+            self.qc_equipment_type_radio_frame.pack(fill=tk.X, pady=(0, 10))
+            
+            # QC 검수용 Equipment Type 선택 변수
+            self.qc_selected_equipment_type = tk.StringVar()
+            
+            # Equipment Types 로드 및 라디오버튼 생성
+            self.qc_equipment_type_radios = []
+            types = self.custom_qc_config.get_equipment_types()
+            
+            for eq_type in types:
+                radio = ttk.Radiobutton(
+                    self.qc_equipment_type_radio_frame, 
+                    text=eq_type, 
+                    variable=self.qc_selected_equipment_type, 
+                    value=eq_type
+                )
+                radio.pack(side=tk.LEFT, padx=10)
+                self.qc_equipment_type_radios.append(radio)
+            
+            if types:
+                self.qc_selected_equipment_type.set(types[0])
+            
+            # 스펙 관리로 이동 버튼
+            ttk.Button(type_frame, text="⚙️ 스펙 관리로 이동", 
+                      command=self.goto_qc_spec_management_tab).pack(side=tk.LEFT, padx=10)
+            
+            # ============================================
+            # 2. 검수 파일 정보
+            # ============================================
+            file_frame = ttk.LabelFrame(qc_tab, text="검수 파일", padding=12)
+            file_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+            
+            self.qc_file_info_label = ttk.Label(
+                file_frame, 
+                text="선택된 파일: 현재 로드된 파일 사용",
+                font=("Segoe UI", 9)
+            )
+            self.qc_file_info_label.pack(side=tk.LEFT, padx=5)
+            
+            # ============================================
+            # 3. 검수 실행
+            # ============================================
+            action_frame = ttk.LabelFrame(qc_tab, text="검수 실행", padding=12)
+            action_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+            
+            ttk.Button(action_frame, text="▶️ QC 검수 실행", 
+                      command=self.run_custom_qc_inspection,
+                      width=20).pack(side=tk.LEFT, padx=5)
+            
+            ttk.Button(action_frame, text="📊 결과 내보내기", 
+                      command=self.export_qc_inspection_results,
+                      width=20).pack(side=tk.LEFT, padx=5)
+            
+            self.qc_inspection_status_label = ttk.Label(
+                action_frame,
+                text="대기 중...",
+                font=("Segoe UI", 9),
+                foreground="blue"
+            )
+            self.qc_inspection_status_label.pack(side=tk.LEFT, padx=20)
+            
+            # ============================================
+            # 4. 검수 결과 테이블 (QC 스펙 관리 탭과 동일한 구조)
+            # ============================================
+            result_frame = ttk.LabelFrame(qc_tab, text="검수 결과", padding=10)
+            result_frame.pack(fill=tk.BOTH, expand=True, padx=15, pady=(0, 10))
+            
+            tree_frame = ttk.Frame(result_frame)
+            tree_frame.pack(fill=tk.BOTH, expand=True)
+            
+            # 결과 트리뷰 컬럼
+            columns = ("no", "item_name", "min_spec", "max_spec", "unit", 
+                      "measured_value", "result", "deviation", "file_name")
+            
+            self.qc_inspection_tree = ttk.Treeview(tree_frame, columns=columns, 
+                                                   show="headings", height=20)
+            
+            # 컬럼 헤더
+            headers = {
+                "no": "No.",
+                "item_name": "Item Name",
+                "min_spec": "Min Spec",
+                "max_spec": "Max Spec",
+                "unit": "Unit",
+                "measured_value": "Measured Value",
+                "result": "Result",
+                "deviation": "Deviation",
+                "file_name": "File"
+            }
+            
+            widths = {
+                "no": 50, "item_name": 200, "min_spec": 100, "max_spec": 100,
+                "unit": 80, "measured_value": 120, "result": 80, 
+                "deviation": 100, "file_name": 150
+            }
+            
+            for col in columns:
+                self.qc_inspection_tree.heading(col, text=headers[col])
+                self.qc_inspection_tree.column(col, width=widths[col], minwidth=50)
+            
+            # Pass/Fail 색상 태그
+            self.qc_inspection_tree.tag_configure('pass', foreground='green')
+            self.qc_inspection_tree.tag_configure('fail', foreground='red', 
+                                                  background='#ffeeee')
+            self.qc_inspection_tree.tag_configure('error', foreground='gray')
+            
+            # 스크롤바
+            v_scrollbar = ttk.Scrollbar(tree_frame, orient="vertical", 
+                                        command=self.qc_inspection_tree.yview)
+            h_scrollbar = ttk.Scrollbar(tree_frame, orient="horizontal", 
+                                        command=self.qc_inspection_tree.xview)
+            self.qc_inspection_tree.configure(yscrollcommand=v_scrollbar.set, 
+                                              xscrollcommand=h_scrollbar.set)
+            
+            # 배치
+            self.qc_inspection_tree.grid(row=0, column=0, sticky="nsew")
+            v_scrollbar.grid(row=0, column=1, sticky="ns")
+            h_scrollbar.grid(row=1, column=0, sticky="ew")
+            
+            tree_frame.grid_rowconfigure(0, weight=1)
+            tree_frame.grid_columnconfigure(0, weight=1)
+            
+            # ============================================
+            # 5. 검수 요약
+            # ============================================
+            summary_frame = ttk.LabelFrame(qc_tab, text="검수 요약", padding=10)
+            summary_frame.pack(fill=tk.X, padx=15, pady=(0, 10))
+            
+            self.qc_inspection_summary_label = ttk.Label(
+                summary_frame,
+                text="검수를 실행하면 결과가 표시됩니다.",
+                font=("Segoe UI", 10)
+            )
+            self.qc_inspection_summary_label.pack()
+            
+            self.update_log("✅ Custom QC 검수 탭 생성 완료")
+            
+        except Exception as e:
+            self.update_log(f"❌ QC 검수 탭 생성 오류: {e}")
+            import traceback
+            traceback.print_exc()
+    
+    def run_custom_qc_inspection(self):
+        """QC 스펙 관리 탭의 스펙으로 검수 실행"""
+        
+        # 1. Equipment Type 확인
+        equipment_type = self.qc_selected_equipment_type.get()
+        
+        if not equipment_type:
+            messagebox.showwarning("경고", "Equipment Type을 선택하세요.")
+            return
+        
+        # 2. QC 스펙 로드 (QC 스펙 관리 탭에서 정의한 스펙)
+        specs = self.custom_qc_config.get_specs(equipment_type)
+        
+        if not specs:
+            messagebox.showwarning("경고", 
+                f"'{equipment_type}'에 등록된 QC 스펙이 없습니다.\n"
+                "먼저 'QC 스펙 관리' 탭에서 스펙을 추가하세요."
+            )
+            return
+        
+        # 3. 검수할 파일 데이터 확인
+        if not self.merged_df or self.merged_df.empty:
+            messagebox.showwarning("경고", "검수할 DB 파일을 먼저 불러오세요.")
+            return
+        
+        # 4. 트리뷰 초기화
+        for item in self.qc_inspection_tree.get_children():
+            self.qc_inspection_tree.delete(item)
+        
+        # 5. 검수 실행
+        self.qc_inspection_status_label.config(text="🔄 검수 진행 중...", foreground="orange")
+        self.window.update()
+        
+        results = []
+        pass_count = 0
+        fail_count = 0
+        
+        try:
+            for idx, spec in enumerate(specs, 1):
+                if not spec.get('enabled', True):
+                    continue  # 비활성화된 항목 건너뛰기
+                
+                item_name = spec['item_name']
+                min_spec = spec['min_spec']
+                max_spec = spec['max_spec']
+                unit = spec.get('unit', '')
+                
+                # 각 파일에서 해당 ItemName의 값 찾기
+                for file_name in self.file_names:
+                    # merged_df에서 해당 ItemName과 Model 찾기
+                    matching_rows = self.merged_df[
+                        (self.merged_df['ItemName'] == item_name) & 
+                        (self.merged_df['Model'] == file_name)
+                    ]
+                    
+                    if not matching_rows.empty:
+                        measured_value = matching_rows.iloc[0]['ItemValue']
+                        
+                        try:
+                            measured_float = float(measured_value)
+                            
+                            # Pass/Fail 판별
+                            if min_spec <= measured_float <= max_spec:
+                                result = "✅ Pass"
+                                tag = 'pass'
+                                pass_count += 1
+                            else:
+                                result = "❌ Fail"
+                                tag = 'fail'
+                                fail_count += 1
+                            
+                            # 편차 계산
+                            deviation = ""
+                            if measured_float < min_spec:
+                                deviation = f"▼ {min_spec - measured_float:.3f}"
+                            elif measured_float > max_spec:
+                                deviation = f"▲ {measured_float - max_spec:.3f}"
+                            
+                            # 결과 추가
+                            self.qc_inspection_tree.insert('', 'end', values=(
+                                len(results) + 1,
+                                item_name,
+                                min_spec,
+                                max_spec,
+                                unit,
+                                measured_float,
+                                result,
+                                deviation,
+                                file_name
+                            ), tags=(tag,))
+                            
+                            results.append({
+                                'item_name': item_name,
+                                'min_spec': min_spec,
+                                'max_spec': max_spec,
+                                'unit': unit,
+                                'measured_value': measured_float,
+                                'result': result,
+                                'deviation': deviation,
+                                'file_name': file_name,
+                                'equipment_type': equipment_type
+                            })
+                            
+                        except ValueError:
+                            # 숫자로 변환 불가능한 경우
+                            self.qc_inspection_tree.insert('', 'end', values=(
+                                len(results) + 1,
+                                item_name,
+                                min_spec,
+                                max_spec,
+                                unit,
+                                measured_value,
+                                "⚠️ Error",
+                                "값 변환 불가",
+                                file_name
+                            ), tags=('error',))
+            
+            # 6. 요약 통계 표시
+            total = pass_count + fail_count
+            pass_rate = (pass_count / total * 100) if total > 0 else 0
+            
+            summary_text = (
+                f"📊 검수 완료: Total {total}개 | "
+                f"✅ Pass {pass_count}개 ({pass_rate:.1f}%) | "
+                f"❌ Fail {fail_count}개"
+            )
+            self.qc_inspection_summary_label.config(text=summary_text)
+            self.qc_inspection_status_label.config(text="✅ 검수 완료", foreground="green")
+            
+            # 결과 저장 (Export용)
+            self.qc_inspection_results = results
+            
+            self.update_log(
+                f"✅ QC 검수 완료: {equipment_type} / {total}개 항목 / "
+                f"Pass {pass_count} / Fail {fail_count}"
+            )
+            
+            if fail_count > 0:
+                self.update_log(f"⚠️ {fail_count}개 항목이 스펙을 벗어났습니다.")
+            
+        except Exception as e:
+            self.qc_inspection_status_label.config(text="❌ 검수 실패", foreground="red")
+            messagebox.showerror("오류", f"QC 검수 중 오류 발생:\n{str(e)}")
+            self.update_log(f"❌ QC 검수 오류: {str(e)}")
+            import traceback
+            traceback.print_exc()
+    
+    def export_qc_inspection_results(self):
+        """QC 검수 결과 내보내기"""
+        if not hasattr(self, 'qc_inspection_results') or not self.qc_inspection_results:
+            messagebox.showwarning("경고", "내보낼 검수 결과가 없습니다.")
+            return
+        
+        import pandas as pd
+        
+        filepath = filedialog.asksaveasfilename(
+            title="검수 결과 저장",
+            defaultextension=".csv",
+            filetypes=[("CSV files", "*.csv"), ("Excel files", "*.xlsx")]
+        )
+        
+        if filepath:
+            try:
+                df = pd.DataFrame(self.qc_inspection_results)
+                
+                if filepath.endswith('.xlsx'):
+                    df.to_excel(filepath, index=False)
+                else:
+                    df.to_csv(filepath, index=False, encoding='utf-8-sig')
+                
+                messagebox.showinfo("완료", f"검수 결과가 저장되었습니다:\n{filepath}")
+                self.update_log(f"📥 검수 결과 내보내기: {filepath}")
+                
+            except Exception as e:
+                messagebox.showerror("오류", f"결과 내보내기 실패:\n{str(e)}")
+    
+    def goto_qc_spec_management_tab(self):
+        """QC 스펙 관리 탭으로 이동"""
+        for i in range(self.main_notebook.index("end")):
+            tab_text = self.main_notebook.tab(i, "text")
+            if "QC 스펙 관리" in tab_text:
+                self.main_notebook.select(i)
+                self.update_log("[Navigation] QC 스펙 관리 탭으로 이동")
+                return
+        
+        # 탭이 없으면 생성
+        if self.admin_mode:
+            self.create_qc_spec_management_tab()
+            self.update_log("[Navigation] QC 스펙 관리 탭 생성 및 이동")
 
 
 

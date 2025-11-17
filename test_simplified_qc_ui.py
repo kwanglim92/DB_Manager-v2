@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 간소화된 QC 검수 UI 프로토타입
-Phase 1: 독립적인 테스트 모듈
+Phase 1: 독립적인 테스트 모듈 - Custom Configuration 버전
 """
 
 import tkinter as tk
@@ -10,27 +10,69 @@ import pandas as pd
 from datetime import datetime
 import json
 import os
+import sys
+
+# Custom QC 모듈 import
+sys.path.append(os.path.dirname(os.path.abspath(__file__)))
+from src.app.qc_custom_config import CustomQCConfig
+from src.app.dialogs.qc_spec_editor_dialog import QCSpecEditorDialog
 
 class SimplifiedQCTab:
-    """간소화된 QC 검수 UI - 프로토타입"""
+    """간소화된 QC 검수 UI - Custom Configuration 버전"""
     
-    def __init__(self, parent):
+    def __init__(self, parent, root_window=None):
         self.parent = parent
+        self.root_window = root_window  # 설정 다이얼로그용
         self.frame = ttk.Frame(parent)
         self.selected_files = []
         self.qc_results = []
         
+        # Custom Configuration 로드
+        self.config = CustomQCConfig(config_path="qc_custom_config.json")
+        self.ensure_default_config()
+        
         # UI 생성
         self.create_ui()
-        
-        # 샘플 스펙 데이터 (실제는 QC_Spec_Master에서 로드)
-        self.sample_specs = {
-            'Temperature': {'min': 20, 'max': 25},
-            'Pressure': {'min': 100, 'max': 200},
-            'Flow_Rate': {'min': 10, 'max': 20},
-            'Voltage': {'min': 3.2, 'max': 3.4},
-            'Current': {'min': 0.8, 'max': 1.2}
-        }
+    
+    def ensure_default_config(self):
+        """기본 설정 확인 및 생성"""
+        # Equipment Types이 없으면 기본값 추가
+        if not self.config.get_equipment_types():
+            # 기본 Equipment Types 추가
+            default_types = [
+                "Standard Model",
+                "Advanced Model", 
+                "Custom Model",
+                "Test Configuration"
+            ]
+            
+            for eq_type in default_types:
+                self.config.add_equipment_type(eq_type)
+                
+                # 각 타입별 기본 스펙 추가
+                if eq_type == "Standard Model":
+                    specs = [
+                        {'item_name': 'Temperature', 'min_spec': 20, 'max_spec': 25, 'unit': '°C', 'enabled': True},
+                        {'item_name': 'Pressure', 'min_spec': 100, 'max_spec': 200, 'unit': 'kPa', 'enabled': True},
+                        {'item_name': 'Flow_Rate', 'min_spec': 10, 'max_spec': 20, 'unit': 'L/min', 'enabled': True}
+                    ]
+                elif eq_type == "Advanced Model":
+                    specs = [
+                        {'item_name': 'Temperature', 'min_spec': 18, 'max_spec': 28, 'unit': '°C', 'enabled': True},
+                        {'item_name': 'Pressure', 'min_spec': 80, 'max_spec': 220, 'unit': 'kPa', 'enabled': True},
+                        {'item_name': 'Voltage', 'min_spec': 3.2, 'max_spec': 3.4, 'unit': 'V', 'enabled': True},
+                        {'item_name': 'Current', 'min_spec': 0.8, 'max_spec': 1.2, 'unit': 'A', 'enabled': True}
+                    ]
+                else:
+                    # 기본 빈 스펙
+                    specs = [
+                        {'item_name': 'Item_1', 'min_spec': 0, 'max_spec': 100, 'unit': '', 'enabled': True},
+                        {'item_name': 'Item_2', 'min_spec': 0, 'max_spec': 100, 'unit': '', 'enabled': True}
+                    ]
+                
+                self.config.update_specs(eq_type, specs)
+            
+            self.config.save_config()
     
     def create_ui(self):
         """간소화된 UI 생성"""
@@ -46,10 +88,17 @@ class SimplifiedQCTab:
         self.equipment_var = tk.StringVar()
         self.equipment_combo = ttk.Combobox(control_panel, 
                                            textvariable=self.equipment_var,
-                                           values=["Model A", "Model B", "Model C"],
+                                           values=self.config.get_equipment_types(),
                                            width=20, state="readonly")
         self.equipment_combo.pack(side=tk.LEFT, padx=(0, 15))
-        self.equipment_combo.set("Model A")
+        equipment_types = self.config.get_equipment_types()
+        if equipment_types:
+            self.equipment_combo.set(equipment_types[0])
+        
+        # 설정 편집 버튼
+        self.config_btn = ttk.Button(control_panel, text="⚙️ 설정",
+                                    command=self.edit_config)
+        self.config_btn.pack(side=tk.LEFT, padx=(0, 10))
         
         # 파일 선택 버튼
         self.select_btn = ttk.Button(control_panel, text="📁 파일 선택",
@@ -146,10 +195,44 @@ class SimplifiedQCTab:
             # 자동으로 검수 실행
             self.run_qc_inspection()
     
+    def edit_config(self):
+        """설정 편집 다이얼로그 열기"""
+        if self.root_window:
+            dialog = QCSpecEditorDialog(self.root_window, self.config)
+            if dialog.result:
+                # 설정이 변경되면 저장 및 UI 업데이트
+                self.config = dialog.result
+                self.config.save_config()
+                
+                # Equipment Type 콤보박스 업데이트
+                self.equipment_combo['values'] = self.config.get_equipment_types()
+                equipment_types = self.config.get_equipment_types()
+                if equipment_types:
+                    # 현재 선택된 타입이 여전히 존재하면 유지
+                    current = self.equipment_var.get()
+                    if current in equipment_types:
+                        self.equipment_combo.set(current)
+                    else:
+                        self.equipment_combo.set(equipment_types[0])
+                
+                messagebox.showinfo("완료", "설정이 저장되었습니다")
+    
     def run_qc_inspection(self):
         """QC 검수 실행"""
         if not self.selected_files:
             messagebox.showwarning("경고", "파일을 먼저 선택하세요")
+            return
+        
+        # 선택된 Equipment Type 가져오기
+        selected_type = self.equipment_var.get()
+        if not selected_type:
+            messagebox.showwarning("경고", "Equipment Type을 선택하세요")
+            return
+        
+        # 해당 타입의 스펙 가져오기
+        specs = self.config.get_specs(selected_type)
+        if not specs:
+            messagebox.showwarning("경고", f"{selected_type}에 대한 스펙이 정의되지 않았습니다.\n⚙️ 설정 버튼으로 스펙을 추가하세요.")
             return
         
         # 결과 초기화
@@ -157,21 +240,30 @@ class SimplifiedQCTab:
         
         # 샘플 데이터 생성 (실제는 파일에서 읽음)
         import random
-        for item_name, spec in self.sample_specs.items():
+        for spec_item in specs:
+            if not spec_item.get('enabled', True):
+                continue  # 비활성화된 항목은 건너뛰기
+            
+            item_name = spec_item['item_name']
+            min_spec = spec_item['min_spec']
+            max_spec = spec_item['max_spec']
+            unit = spec_item.get('unit', '')
+            
             # 측정값 생성 (일부는 스펙 벗어나게)
             if random.random() > 0.8:  # 20% 확률로 Fail
-                measured = spec['min'] - random.uniform(1, 5)
+                measured = min_spec - random.uniform(1, 5)
             else:
-                measured = random.uniform(spec['min'], spec['max'])
+                measured = random.uniform(min_spec, max_spec)
             
             # Pass/Fail 판정
-            pass_fail = "✅ Pass" if spec['min'] <= measured <= spec['max'] else "❌ Fail"
+            pass_fail = "✅ Pass" if min_spec <= measured <= max_spec else "❌ Fail"
             
             self.qc_results.append({
                 'item_name': item_name,
                 'measured': round(measured, 2),
-                'min_spec': spec['min'],
-                'max_spec': spec['max'],
+                'min_spec': min_spec,
+                'max_spec': max_spec,
+                'unit': unit,
                 'result': pass_fail
             })
         
@@ -203,12 +295,18 @@ class SimplifiedQCTab:
                 fail_count += 1
                 tag = 'fail'
             
+            # 단위 포함한 값 표시
+            unit = result.get('unit', '')
+            measured_str = f"{result['measured']}{unit}" if unit else str(result['measured'])
+            min_str = f"{result['min_spec']}{unit}" if unit else str(result['min_spec'])
+            max_str = f"{result['max_spec']}{unit}" if unit else str(result['max_spec'])
+            
             # 트리뷰에 추가
             self.result_tree.insert('', 'end', 
                                    values=(result['item_name'],
-                                          result['measured'],
-                                          result['min_spec'],
-                                          result['max_spec'],
+                                          measured_str,
+                                          min_str,
+                                          max_str,
                                           result['result']),
                                    tags=(tag,))
         
@@ -218,14 +316,10 @@ class SimplifiedQCTab:
                                       background='#ffeeee')
         
         # 요약 업데이트
-        if not show_fail:
-            total = len(self.qc_results)
-        else:
-            total = fail_count
-            
-        pass_rate = (pass_count / max(1, pass_count + fail_count)) * 100
+        total = len(self.qc_results)
+        pass_rate = (pass_count / max(1, total)) * 100 if total > 0 else 0
         
-        summary_text = f"Total: {pass_count + fail_count} | "
+        summary_text = f"Total: {total} | "
         summary_text += f"Pass: {pass_count} ({pass_rate:.1f}%) | "
         summary_text += f"Fail: {fail_count}"
         
@@ -273,8 +367,8 @@ class SimplifiedQCTab:
 def main():
     """독립 실행 테스트"""
     root = tk.Tk()
-    root.title("간소화된 QC 검수 UI - 프로토타입")
-    root.geometry("800x600")
+    root.title("간소화된 QC 검수 UI - Custom Configuration")
+    root.geometry("900x650")
     
     # 스타일 설정
     style = ttk.Style()
@@ -284,32 +378,35 @@ def main():
     notebook = ttk.Notebook(root)
     notebook.pack(fill=tk.BOTH, expand=True, padx=5, pady=5)
     
-    # 간소화 탭
-    simplified_tab = SimplifiedQCTab(notebook)
-    notebook.add(simplified_tab.frame, text="간소화 QC 검수 (Beta)")
+    # 간소화 탭 (root_window 전달)
+    simplified_tab = SimplifiedQCTab(notebook, root_window=root)
+    notebook.add(simplified_tab.frame, text="Custom QC 검수 (독립형)")
     
     # 비교용 빈 탭 (기존 UI 자리)
     legacy_frame = ttk.Frame(notebook)
-    ttk.Label(legacy_frame, text="기존 QC 검수 UI 위치\n(비교 테스트용)",
+    ttk.Label(legacy_frame, text="기존 QC 검수 UI 위치\n(DB 기반)",
              font=("Segoe UI", 14)).pack(pady=50)
     notebook.add(legacy_frame, text="기존 QC 검수")
     
     # 정보 표시
     info_text = """
-    🧪 간소화된 QC 검수 UI 프로토타입
+    🧪 Custom Configuration QC 검수 UI
     
     주요 특징:
-    • 한 줄 제어 패널
-    • 자동 검수 실행
-    • 간단한 Pass/Fail 표시
-    • Fail 항목 필터링
+    • DB 독립적 Equipment Type 관리
+    • 사용자 정의 QC 스펙 설정
+    • JSON 기반 설정 저장/로드
+    • 설정 편집 GUI 제공
     
     테스트 방법:
-    1. Equipment Type 선택
-    2. 파일 선택 클릭
-    3. 결과 자동 표시
-    4. Fail 항목만 보기 체크
-    5. 결과 내보내기
+    1. ⚙️ 설정 버튼으로 Equipment Type 추가/편집
+    2. 각 Type별 검수 항목 정의
+    3. Equipment Type 선택
+    4. 파일 선택 → 자동 검수
+    5. 결과 확인 및 내보내기
+    
+    💡 Equipment Types과 스펙은 완전히 사용자가 정의합니다!
+       Default DB와 완전히 독립적으로 작동합니다.
     """
     
     info_frame = ttk.Frame(root)
