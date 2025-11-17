@@ -51,7 +51,10 @@ class DBSchema:
         """
         conn_provided = conn_override is not None
         conn = conn_override if conn_provided else sqlite3.connect(self.db_path)
-        
+
+        # Row factory 설정: dict 형식 접근 가능
+        conn.row_factory = sqlite3.Row
+
         try:
             yield conn
         finally:

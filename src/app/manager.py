@@ -2749,10 +2749,10 @@ class DBManager:
             # 장비 유형 관리 버튼들
             type_buttons_frame = ttk.Frame(equipment_frame)
             type_buttons_frame.pack(fill=tk.X)
-            
-            add_type_btn = ttk.Button(type_buttons_frame, text="Add Equipment Type", 
-                                    command=self.add_equipment_type_dialog, width=18)
-            add_type_btn.pack(side=tk.LEFT, padx=(0, 6))
+
+            hierarchy_btn = ttk.Button(type_buttons_frame, text="🏗️ Hierarchy Manager",
+                                     command=self.open_equipment_hierarchy, width=20)
+            hierarchy_btn.pack(side=tk.LEFT, padx=(0, 6))
             
             delete_type_btn = ttk.Button(type_buttons_frame, text="Delete", 
                                        command=self.delete_equipment_type, width=10)
@@ -3517,126 +3517,6 @@ class DBManager:
         
         self.update_log(f"✅ Default DB 표시 업데이트 완료: {total_count}개 항목 (Check list: {performance_count}개)")
 
-    def add_equipment_type_dialog(self):
-        """새 장비 유형 추가 다이얼로그 (Phase 1.5 - Model 선택 필수)"""
-        dlg = tk.Toplevel(self.window)
-        dlg.title("새 장비 유형 추가")
-        dlg.geometry("450x300")
-        dlg.transient(self.window)
-        dlg.grab_set()
-
-        # 부모 창 중앙에 배치
-        from app.loading import center_dialog_on_parent
-        center_dialog_on_parent(dlg, self.window)
-
-        # Model 선택 (Phase 1.5 필수)
-        ttk.Label(dlg, text="장비 모델 (필수):").pack(pady=(15, 5))
-        model_var = tk.StringVar()
-        model_combo = ttk.Combobox(dlg, textvariable=model_var, state="readonly", width=40)
-        model_combo.pack(pady=5)
-
-        # Equipment_Models 로드
-        try:
-            with self.db_schema.get_connection() as conn:
-                cursor = conn.cursor()
-                cursor.execute("SELECT id, model_name FROM Equipment_Models ORDER BY display_order, model_name")
-                models = cursor.fetchall()
-                model_map = {f"{name} (ID: {mid})": mid for mid, name in models}
-                model_combo['values'] = list(model_map.keys())
-                if model_combo['values']:
-                    model_combo.current(0)  # 첫 번째 항목 선택
-        except Exception as e:
-            messagebox.showerror("오류", f"모델 목록 로드 실패:\n{str(e)}")
-            dlg.destroy()
-            return
-
-        # Equipment Type 이름
-        ttk.Label(dlg, text="장비 유형 이름 (필수):").pack(pady=(10, 5))
-        name_var = tk.StringVar()
-        name_entry = ttk.Entry(dlg, textvariable=name_var, width=40)
-        name_entry.pack(pady=5)
-        name_entry.focus()
-
-        # 설명
-        ttk.Label(dlg, text="설명 (선택사항):").pack(pady=(10, 5))
-        desc_var = tk.StringVar()
-        desc_entry = ttk.Entry(dlg, textvariable=desc_var, width=40)
-        desc_entry.pack(pady=5)
-
-        def on_add():
-            # 검증
-            model_str = model_var.get().strip()
-            name = name_var.get().strip()
-
-            if not model_str:
-                messagebox.showerror("오류", "장비 모델을 선택해주세요.")
-                return
-
-            if not name:
-                messagebox.showerror("오류", "장비 유형 이름을 입력해주세요.")
-                return
-
-            try:
-                # Model ID 추출
-                model_id = model_map[model_str]
-                description = desc_var.get().strip()
-
-                # CategoryService 사용 (Phase 1.5)
-                if not hasattr(self, 'service_factory') or not self.service_factory:
-                    messagebox.showerror("오류", "ServiceFactory가 초기화되지 않았습니다.")
-                    return
-
-                category_service = self.service_factory.get_category_service()
-                if not category_service:
-                    messagebox.showerror("오류", "CategoryService를 사용할 수 없습니다.")
-                    return
-
-                # Equipment Type 생성
-                type_id = category_service.create_type(
-                    model_id=model_id,
-                    type_name=name,
-                    description=description if description else None
-                )
-
-                self.update_log(f"✅ 새 장비 유형 추가: {name} (Model ID: {model_id}, Type ID: {type_id})")
-
-                # Audit Log 기록
-                self.db_schema.log_change_history(
-                    "add",
-                    "equipment_type",
-                    f"{model_str} - {name}",
-                    "",
-                    description,
-                    "admin"
-                )
-
-                # 목록 새로고침
-                self.refresh_equipment_types()
-
-                # 새로 추가된 항목 선택 시도
-                type_names = self.equipment_type_combo['values']
-                for type_name in type_names:
-                    if f"ID: {type_id}" in type_name:
-                        self.equipment_type_combo.set(type_name)
-                        self.on_equipment_type_selected()
-                        break
-
-                dlg.destroy()
-                messagebox.showinfo("성공", f"장비 유형 '{name}'이(가) 추가되었습니다.")
-
-            except ValueError as ve:
-                # 중복 등 검증 에러
-                messagebox.showerror("검증 오류", str(ve))
-            except Exception as e:
-                # 기타 에러
-                messagebox.showerror("오류", f"장비 유형 추가 실패:\n{str(e)}")
-                self.update_log(f"❌ 장비 유형 추가 실패: {str(e)}")
-
-        button_frame = ttk.Frame(dlg)
-        button_frame.pack(pady=20)
-
-        ttk.Button(button_frame, text="추가", command=on_add, width=10).pack(side=tk.LEFT, padx=5)
-        ttk.Button(button_frame, text="취소", command=dlg.destroy, width=10).pack(side=tk.LEFT, padx=5)
 
     def delete_equipment_type(self):
         """선택된 장비 유형을 삭제합니다."""

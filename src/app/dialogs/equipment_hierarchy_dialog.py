@@ -72,23 +72,23 @@ class EquipmentHierarchyDialog:
 
         ttk.Button(
             toolbar_frame,
-            text="➕ Add Model",
+            text="➕ Add Model (모델명)",
             command=self._add_model,
-            width=15
+            width=20
         ).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(
             toolbar_frame,
-            text="🔧 Add Type",
+            text="🔧 Add Type (AE 형태)",
             command=self._add_type,
-            width=15
+            width=20
         ).pack(side=tk.LEFT, padx=2)
 
         ttk.Button(
             toolbar_frame,
-            text="⚙️ Add Configuration",
+            text="⚙️ Add Config (구성)",
             command=self._add_configuration,
-            width=18
+            width=20
         ).pack(side=tk.LEFT, padx=2)
 
         # Tree View 프레임
@@ -284,12 +284,24 @@ class EquipmentHierarchyDialog:
         )
 
         try:
-            model_id = self.category_service.create_equipment_model(
+            model_id = self.category_service.create_model(
                 model_name=model_name,
                 description=description
             )
             messagebox.showinfo("성공", f"Model '{model_name}' 추가 완료 (ID: {model_id})")
             self._refresh()
+
+            # Type 추가 안내
+            response = messagebox.askyesno(
+                "Type 추가",
+                f"Model '{model_name}'이(가) 추가되었습니다.\n\n"
+                f"바로 Type (AE 형태)을 추가하시겠습니까?\n"
+                f"(예: 분리형, 일체형)"
+            )
+
+            if response:
+                self._add_type_for_model(model_id)
+
         except Exception as e:
             messagebox.showerror("오류", f"Model 추가 실패:\n{str(e)}")
 
@@ -309,14 +321,54 @@ class EquipmentHierarchyDialog:
 
         if not model_id:
             # Model 목록에서 선택
-            models = self.category_service.get_all_equipment_models()
+            models = self.category_service.get_all_models()
             if not models:
                 messagebox.showwarning("경고", "먼저 Model을 추가해주세요.")
                 return
 
-            model_names = [m.model_name for m in models]
-            # TODO: Combobox dialog로 개선
-            model_id = models[0].id  # 임시: 첫 번째 모델 선택
+            # Model 선택 다이얼로그
+            model_dialog = tk.Toplevel(self.dialog)
+            model_dialog.title("Model 선택")
+            model_dialog.geometry("400x150")
+            model_dialog.transient(self.dialog)
+            model_dialog.grab_set()
+
+            tk.Label(model_dialog, text="장비 모델 선택:", font=("Segoe UI", 10)).pack(pady=10)
+
+            model_var = tk.StringVar()
+            model_map = {m.model_name: m.id for m in models}
+            model_combo = ttk.Combobox(model_dialog,
+                                      textvariable=model_var,
+                                      values=list(model_map.keys()),
+                                      state="readonly", width=35)
+            model_combo.pack(pady=5)
+            if model_combo['values']:
+                model_combo.current(0)
+
+            selected_model_id = [None]  # 클로저용 리스트
+
+            def on_confirm():
+                selected_name = model_var.get()
+                if selected_name:
+                    selected_model_id[0] = model_map[selected_name]
+                    model_dialog.destroy()
+                else:
+                    messagebox.showwarning("경고", "모델을 선택해주세요.")
+
+            def on_cancel():
+                model_dialog.destroy()
+
+            button_frame = ttk.Frame(model_dialog)
+            button_frame.pack(pady=15)
+            ttk.Button(button_frame, text="확인", command=on_confirm, width=10).pack(side=tk.LEFT, padx=5)
+            ttk.Button(button_frame, text="취소", command=on_cancel, width=10).pack(side=tk.LEFT, padx=5)
+
+            model_dialog.wait_window()
+
+            if not selected_model_id[0]:
+                return  # 사용자가 취소함
+
+            model_id = selected_model_id[0]
 
         type_name = simpledialog.askstring(
             "Add Equipment Type",
@@ -334,7 +386,7 @@ class EquipmentHierarchyDialog:
         )
 
         try:
-            type_id = self.category_service.create_equipment_type(
+            type_id = self.category_service.create_type(
                 model_id=model_id,
                 type_name=type_name,
                 description=description
@@ -408,7 +460,7 @@ class EquipmentHierarchyDialog:
     def _edit_model(self, model_id):
         """Model 수정"""
         # TODO: 상세 Edit Dialog 구현
-        model = self.category_service.get_equipment_model_by_id(model_id)
+        model = self.category_service.get_model_by_id(model_id)
         if not model:
             messagebox.showerror("오류", "Model을 찾을 수 없습니다.")
             return
@@ -520,6 +572,57 @@ class EquipmentHierarchyDialog:
         except Exception as e:
             messagebox.showerror("오류", f"삭제 실패:\n{str(e)}")
 
+    def _add_type_for_model(self, model_id: int):
+        """특정 Model에 Type 추가 (Add Model 후 연속 추가용)"""
+        # Type 이름 입력
+        type_name = simpledialog.askstring(
+            "Add Equipment Type",
+            "Type Name (AE 형태, 예: 분리형, 일체형):",
+            parent=self.dialog
+        )
+
+        if not type_name:
+            return
+
+        # 설명 입력
+        description = simpledialog.askstring(
+            "Add Equipment Type",
+            "Description (선택):",
+            parent=self.dialog
+        )
+
+        try:
+            # Type 생성
+            type_id = self.category_service.create_type(
+                model_id=model_id,
+                type_name=type_name.strip(),
+                description=description.strip() if description else None
+            )
+
+            messagebox.showinfo("성공", f"Type '{type_name}' 추가 완료 (ID: {type_id})")
+
+            # Configuration 추가 안내 (선택)
+            response = messagebox.askyesno(
+                "Configuration 추가",
+                "Configuration도 추가하시겠습니까?\n"
+                "(Port 구성, Wafer 크기 등)"
+            )
+
+            if response:
+                # Configuration 추가 다이얼로그 열기
+                from app.dialogs.configuration_dialog import ConfigurationDialog
+                ConfigurationDialog(
+                    parent=self.dialog,
+                    configuration_service=self.configuration_service,
+                    type_id=type_id,
+                    config=None  # 새 Configuration
+                )
+
+            self._refresh()
+
+        except Exception as e:
+            messagebox.showerror("오류", f"Type 추가 실패:\n{str(e)}")
+
     def _view_details(self):
         """선택된 항목 상세 정보 표시"""
         item_type, item_id, _ = self._get_selected_item_info()
@@ -529,7 +632,7 @@ class EquipmentHierarchyDialog:
 
         try:
             if item_type == "model":
-                model = self.category_service.get_equipment_model_by_id(item_id)
+                model = self.category_service.get_model_by_id(item_id)
                 details = f"Model ID: {model.id}\n"
                 details += f"Model Name: {model.model_name}\n"
                 details += f"Model Code: {model.model_code or 'N/A'}\n"
