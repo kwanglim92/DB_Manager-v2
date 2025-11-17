@@ -880,6 +880,13 @@ class DBManager:
             # QC 보고서 탭 생성
             self.create_report_tab_in_qc()
             
+            # 🆕 Custom QC Inspection 탭 생성 (CustomQCConfig 기반)
+            try:
+                self.create_custom_qc_inspection_tab()
+                self.update_log("[QC] Custom QC 검수 탭이 생성되었습니다.")
+            except Exception as e:
+                self.update_log(f"⚠️ Custom QC 검수 탭 생성 중 오류: {str(e)}")
+            
         except ImportError:
             # Enhanced QC를 사용할 수 없는 경우 기본 QC 기능 사용
             from app.qc import add_qc_check_functions_to_class
@@ -891,6 +898,13 @@ class DBManager:
                 self.update_log("[QC] 기본 QC 검수 탭이 생성되었습니다.")
             
             self.create_report_tab_in_qc()
+            
+            # 🆕 Custom QC Inspection 탭 생성 (CustomQCConfig 기반)
+            try:
+                self.create_custom_qc_inspection_tab()
+                self.update_log("[QC] Custom QC 검수 탭이 생성되었습니다.")
+            except Exception as e:
+                self.update_log(f"⚠️ Custom QC 검수 탭 생성 중 오류: {str(e)}")
         
         except Exception as e:
             self.update_log(f"❌ QC 탭 생성 중 오류: {str(e)}")
